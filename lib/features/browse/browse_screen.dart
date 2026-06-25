@@ -23,6 +23,7 @@ class BrowseScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = SheepColors.of(context);
     final selectedId = ref.watch(selectedSourceIdProvider);
+    final orderedIds = ref.watch(sourceOrderProvider);
     final popularAsync = ref.watch(popularProvider);
     final latestAsync = ref.watch(latestProvider);
 
@@ -81,57 +82,72 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
-            // ── Source chips ─────────────────────────────────────────────────
+            // ── Source chips (drag to reorder) ────────────────────────────────
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 36,
-                child: ListView.separated(
+                child: ReorderableListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                  itemCount: allSources.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  buildDefaultDragHandles: true,
+                  proxyDecorator: (child, index, animation) => Material(
+                    color: Colors.transparent,
+                    child: child,
+                  ),
+                  onReorder: (oldIndex, newIndex) => ref
+                      .read(sourceOrderProvider.notifier)
+                      .reorder(oldIndex, newIndex),
+                  itemCount: orderedIds.length,
                   itemBuilder: (context, i) {
-                    final source = allSources[i];
-                    final active = source.id == selectedId;
-                    return GestureDetector(
-                      onTap: () => ref
-                          .read(selectedSourceIdProvider.notifier)
-                          .state = source.id,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: active ? c.ink : c.wool,
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(radiusPill),
+                    final sourceId = orderedIds[i];
+                    final source = sourceById(sourceId);
+                    if (source == null) {
+                      return SizedBox.shrink(key: ValueKey(sourceId));
+                    }
+                    final active = sourceId == selectedId;
+                    return Padding(
+                      key: ValueKey(sourceId),
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => ref
+                            .read(selectedSourceIdProvider.notifier)
+                            .state = sourceId,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (active) ...[
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: c.paper,
-                                  shape: BoxShape.circle,
+                          decoration: BoxDecoration(
+                            color: active ? c.ink : c.wool,
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(radiusPill),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (active) ...[
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: c.paper,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(
+                                source.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  height: 1,
+                                  color: active ? c.paper : c.slate,
                                 ),
                               ),
-                              const SizedBox(width: 6),
                             ],
-                            Text(
-                              source.name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                height: 1,
-                                color: active ? c.paper : c.slate,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     );
@@ -192,9 +208,19 @@ class BrowseScreen extends ConsumerWidget {
               error: (e, _) => SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Text(
-                    'Erro ao carregar: ${e.toString().split('\n').first}',
-                    style: TextStyle(fontSize: 13, color: c.slate),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _sourceError(e),
+                        style: TextStyle(fontSize: 13, color: c.slate),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        e.toString(),
+                        style: TextStyle(fontSize: 10, color: c.slate),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -256,6 +282,20 @@ class BrowseScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _sourceError(Object e) {
+  final msg = e.toString();
+  if (msg.contains('404')) return 'Fonte indisponível (página não encontrada).';
+  if (msg.contains('403')) return 'Acesso negado pela fonte. Tente em outro momento.';
+  if (msg.contains('429')) return 'Limite de requisições atingido. Aguarde um momento.';
+  if (msg.contains('SocketException') || msg.contains('connection')) {
+    return 'Sem conexão com a internet.';
+  }
+  if (msg.contains('timeout') || msg.contains('TimeoutException')) {
+    return 'Tempo limite excedido. Verifique sua conexão.';
+  }
+  return 'Erro ao carregar a fonte. Tente novamente.';
 }
 
 Future<void> _onMangaTap(

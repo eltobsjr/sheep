@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../data/settings/settings_repository.dart';
+import '../../data/sources/source_auth.dart';
+import '../../data/sources/source_registry.dart';
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -90,14 +93,32 @@ class SettingsScreen extends ConsumerWidget {
               child: _ChevronRow(label: 'Image quality', value: 'High', c: c),
             ),
 
+            // ── Sources ──────────────────────────────────────────────────────
+            SliverToBoxAdapter(child: _SectionLabel('Sources', c: c)),
+
+            ...allSources
+                // ignore: prefer_iterable_wheretype
+                .where((s) => s is SourceAuth)
+                .map((s) => SliverToBoxAdapter(
+                      child: GestureDetector(
+                        onTap: () =>
+                            context.push('/source-credentials/${s.id}'),
+                        child: _ChevronRow(
+                          label: s.name,
+                          value: 'Login',
+                          c: c,
+                        ),
+                      ),
+                    )),
+
             // ── Appearance ───────────────────────────────────────────────────
             SliverToBoxAdapter(child: _SectionLabel('Appearance', c: c)),
 
             SliverToBoxAdapter(
               child: _SegmentedRow(
                 label: 'Theme',
-                options: const ['Light', 'Dark'],
-                values: const ['light', 'dark'],
+                options: const ['Light', 'Dark', 'System'],
+                values: const ['light', 'dark', 'system'],
                 selected: s.theme,
                 onChanged: n.setTheme,
                 c: c,

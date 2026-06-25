@@ -13,6 +13,7 @@ class Settings {
     this.wifiOnly = true,
     this.imageQuality = 'high',
     this.theme = 'light',
+    this.chapterSort = 'desc',
   });
 
   final String readingMode;
@@ -21,6 +22,7 @@ class Settings {
   final bool wifiOnly;
   final String imageQuality;
   final String theme;
+  final String chapterSort;
 
   Settings copyWith({
     String? readingMode,
@@ -29,6 +31,7 @@ class Settings {
     bool? wifiOnly,
     String? imageQuality,
     String? theme,
+    String? chapterSort,
   }) =>
       Settings(
         readingMode: readingMode ?? this.readingMode,
@@ -37,6 +40,7 @@ class Settings {
         wifiOnly: wifiOnly ?? this.wifiOnly,
         imageQuality: imageQuality ?? this.imageQuality,
         theme: theme ?? this.theme,
+        chapterSort: chapterSort ?? this.chapterSort,
       );
 }
 
@@ -47,6 +51,7 @@ class SettingsNotifier extends Notifier<Settings> {
   static const _kWifi = 'wifi_only';
   static const _kQuality = 'image_quality';
   static const _kTheme = 'theme';
+  static const _kChapterSort = 'chapter_sort';
 
   @override
   Settings build() {
@@ -58,6 +63,7 @@ class SettingsNotifier extends Notifier<Settings> {
       wifiOnly: p.getBool(_kWifi) ?? true,
       imageQuality: p.getString(_kQuality) ?? 'high',
       theme: p.getString(_kTheme) ?? 'light',
+      chapterSort: p.getString(_kChapterSort) ?? 'desc',
     );
   }
 
@@ -91,6 +97,11 @@ class SettingsNotifier extends Notifier<Settings> {
   void setTheme(String v) {
     _p.setString(_kTheme, v);
     state = state.copyWith(theme: v);
+  }
+
+  void setChapterSort(String v) {
+    _p.setString(_kChapterSort, v);
+    state = state.copyWith(chapterSort: v);
   }
 }
 

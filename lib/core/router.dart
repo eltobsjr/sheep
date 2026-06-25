@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/browse/browse_screen.dart';
@@ -7,9 +8,14 @@ import '../features/library/library_screen.dart';
 import '../features/manga_detail/manga_detail_screen.dart';
 import '../features/reader/reader_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/source_credentials/source_credentials_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 
+// Used by app.dart to show dialogs from outside the widget tree.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final router = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/library',
   routes: [
     StatefulShellRoute.indexedStack(
@@ -59,6 +65,12 @@ final router = GoRouter(
       builder: (context, state) => ReaderScreen(
         chapterId: state.pathParameters['chapterId']!,
         mangaId: state.pathParameters['mangaId']!,
+      ),
+    ),
+    GoRoute(
+      path: '/source-credentials/:sourceId',
+      builder: (context, state) => SourceCredentialsScreen(
+        sourceId: state.pathParameters['sourceId']!,
       ),
     ),
   ],

@@ -1212,8 +1212,21 @@ class $ReadingProgressTable extends ReadingProgress
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isReadMeta = const VerificationMeta('isRead');
   @override
-  List<GeneratedColumn> get $columns => [chapterId, lastPage, updatedAt];
+  late final GeneratedColumn<bool> isRead = GeneratedColumn<bool>(
+    'is_read',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_read" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [chapterId, lastPage, updatedAt, isRead];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1250,6 +1263,12 @@ class $ReadingProgressTable extends ReadingProgress
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('is_read')) {
+      context.handle(
+        _isReadMeta,
+        isRead.isAcceptableOrUnknown(data['is_read']!, _isReadMeta),
+      );
+    }
     return context;
   }
 
@@ -1271,6 +1290,10 @@ class $ReadingProgressTable extends ReadingProgress
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      isRead: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_read'],
+      ) ?? false,
     );
   }
 
@@ -1285,10 +1308,12 @@ class ReadingProgressData extends DataClass
   final String chapterId;
   final int lastPage;
   final DateTime updatedAt;
+  final bool isRead;
   const ReadingProgressData({
     required this.chapterId,
     required this.lastPage,
     required this.updatedAt,
+    this.isRead = false,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1296,6 +1321,7 @@ class ReadingProgressData extends DataClass
     map['chapter_id'] = Variable<String>(chapterId);
     map['last_page'] = Variable<int>(lastPage);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['is_read'] = Variable<bool>(isRead);
     return map;
   }
 
@@ -1304,6 +1330,7 @@ class ReadingProgressData extends DataClass
       chapterId: Value(chapterId),
       lastPage: Value(lastPage),
       updatedAt: Value(updatedAt),
+      isRead: Value(isRead),
     );
   }
 
@@ -1316,6 +1343,7 @@ class ReadingProgressData extends DataClass
       chapterId: serializer.fromJson<String>(json['chapterId']),
       lastPage: serializer.fromJson<int>(json['lastPage']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      isRead: serializer.fromJson<bool>(json['isRead'] ?? false),
     );
   }
   @override
@@ -1325,6 +1353,7 @@ class ReadingProgressData extends DataClass
       'chapterId': serializer.toJson<String>(chapterId),
       'lastPage': serializer.toJson<int>(lastPage),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'isRead': serializer.toJson<bool>(isRead),
     };
   }
 
@@ -1332,16 +1361,19 @@ class ReadingProgressData extends DataClass
     String? chapterId,
     int? lastPage,
     DateTime? updatedAt,
+    bool? isRead,
   }) => ReadingProgressData(
     chapterId: chapterId ?? this.chapterId,
     lastPage: lastPage ?? this.lastPage,
     updatedAt: updatedAt ?? this.updatedAt,
+    isRead: isRead ?? this.isRead,
   );
   ReadingProgressData copyWithCompanion(ReadingProgressCompanion data) {
     return ReadingProgressData(
       chapterId: data.chapterId.present ? data.chapterId.value : this.chapterId,
       lastPage: data.lastPage.present ? data.lastPage.value : this.lastPage,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      isRead: data.isRead.present ? data.isRead.value : this.isRead,
     );
   }
 
@@ -1350,37 +1382,42 @@ class ReadingProgressData extends DataClass
     return (StringBuffer('ReadingProgressData(')
           ..write('chapterId: $chapterId, ')
           ..write('lastPage: $lastPage, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('isRead: $isRead')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(chapterId, lastPage, updatedAt);
+  int get hashCode => Object.hash(chapterId, lastPage, updatedAt, isRead);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ReadingProgressData &&
           other.chapterId == this.chapterId &&
           other.lastPage == this.lastPage &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.isRead == this.isRead);
 }
 
 class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
   final Value<String> chapterId;
   final Value<int> lastPage;
   final Value<DateTime> updatedAt;
+  final Value<bool> isRead;
   final Value<int> rowid;
   const ReadingProgressCompanion({
     this.chapterId = const Value.absent(),
     this.lastPage = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.isRead = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReadingProgressCompanion.insert({
     required String chapterId,
     required int lastPage,
     required DateTime updatedAt,
+    this.isRead = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : chapterId = Value(chapterId),
        lastPage = Value(lastPage),
@@ -1389,12 +1426,14 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     Expression<String>? chapterId,
     Expression<int>? lastPage,
     Expression<DateTime>? updatedAt,
+    Expression<bool>? isRead,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (chapterId != null) 'chapter_id': chapterId,
       if (lastPage != null) 'last_page': lastPage,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (isRead != null) 'is_read': isRead,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1403,12 +1442,14 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     Value<String>? chapterId,
     Value<int>? lastPage,
     Value<DateTime>? updatedAt,
+    Value<bool>? isRead,
     Value<int>? rowid,
   }) {
     return ReadingProgressCompanion(
       chapterId: chapterId ?? this.chapterId,
       lastPage: lastPage ?? this.lastPage,
       updatedAt: updatedAt ?? this.updatedAt,
+      isRead: isRead ?? this.isRead,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1425,6 +1466,9 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (isRead.present) {
+      map['is_read'] = Variable<bool>(isRead.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1437,6 +1481,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
           ..write('chapterId: $chapterId, ')
           ..write('lastPage: $lastPage, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('isRead: $isRead, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();

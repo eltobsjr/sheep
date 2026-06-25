@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../../domain/models/chapter.dart';
@@ -7,10 +8,14 @@ import '../http_manga_source.dart';
 // HTML scraper + AJAX for https://mangafire.to (EN)
 // Ported from keiyoushi/extensions-source src/en/mangafire
 //
-// Chapter list:  GET /ajax/manga/{mangaId}/chapter/en
+// Chapter list:  GET /ajax/manga/{slug}/chapter/en
 //   Response:    JSON { "result": "<li data-id='...'><a href='/read/...'>" }
 // Chapter pages: GET /ajax/read/{chapterId}
 //   Response:    JSON { "result": { "images": [["url", pageNum, ""], ...] } }
+//
+// ID format: the manga slug WITHOUT the /manga/ prefix.
+//   e.g. "one-piece.lp7ke" (not "/manga/one-piece.lp7ke")
+//   getDetails / getChapters prepend /manga/ internally.
 class MangaFireSource extends HttpMangaSource {
   @override
   String get id => 'mangafire';
@@ -25,40 +30,57 @@ class MangaFireSource extends HttpMangaSource {
   String get iconAsset => 'assets/svg/sources/mangafire.svg';
 
   @override
-  Map<String, String> get defaultHeaders => const {
-    'User-Agent': 'SheepReader/1.0 (Android)',
+  Map<String, String> get defaultHeaders => {
+    ...super.defaultHeaders,
     'Referer': 'https://mangafire.to/',
   };
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
   MangaStatus _toStatus(String? raw) => switch (raw?.toLowerCase().trim()) {
-    'releasing' || 'ongoing' => MangaStatus.ongoing,
-    'completed' => MangaStatus.completed,
-    'on_hiatus' || 'hiatus' => MangaStatus.hiatus,
-    'discontinued' || 'cancelled' => MangaStatus.cancelled,
-    _ => MangaStatus.unknown,
-  };
+        'releasing' || 'ongoing' => MangaStatus.ongoing,
+        'completed' => MangaStatus.completed,
+        'on_hiatus' || 'hiatus' => MangaStatus.hiatus,
+        'discontinued' || 'cancelled' => MangaStatus.cancelled,
+        _ => MangaStatus.unknown,
+      };
 
-  // MangaFire filter page has .unit.inner cards with a cover img and .name text.
+  // MangaFire may show one card per language for each manga.
+  // We deduplicate by href so each manga appears only once.
   List<MangaSummary> _parseCards(String html) {
     final doc = html_parser.parse(html);
+    final seen = <String>{};
     final results = <MangaSummary>[];
-    for (final card in doc.querySelectorAll('.unit .inner')) {
-      final a = card.querySelector('a') ??
-          card.querySelector('[href]');
+
+    for (final card in doc.querySelectorAll('.unit .inner, .unit')) {
+      final a = card.querySelector('a.poster') ??
+          card.querySelector('a[href*="/manga/"]') ??
+          card.querySelector('a');
       final href = a?.attributes['href'] ?? '';
       if (href.isEmpty || !href.contains('/manga/')) continue;
+      if (!seen.add(href)) continue; // skip duplicate language variants
+
       final path = Uri.tryParse(href)?.path ?? href;
+      // Store only the slug (after /manga/) — avoids double prefix in router.
+      final slug = path.startsWith('/manga/')
+          ? path.substring(7).replaceAll(RegExp(r'/$'), '')
+          : path.replaceAll(RegExp(r'^/|/$'), '');
+
       final img = card.querySelector('img');
       final cover = img?.attributes['src'] ??
-          img?.attributes['data-src'] ?? '';
-      final title = card.querySelector('.name')?.text.trim() ??
-          card.querySelector('b')?.text.trim() ??
-          a?.text.trim() ?? '';
-      if (title.isEmpty) continue;
-      results.add(MangaSummary(
-          id: path, sourceId: id, title: title, coverUrl: cover));
+          img?.attributes['data-src'] ??
+          card.querySelector('source')?.attributes['srcset'] ?? '';
+
+      // img[alt] has the real title — .name may contain the language code.
+      final title = img?.attributes['alt']?.trim() ??
+          a?.attributes['title']?.trim() ??
+          card.querySelector('a.name')?.text.trim() ??
+          card.querySelector('.info .name')?.text.trim() ??
+          card.querySelector('.name')?.text.trim() ??
+          card.querySelector('b')?.text.trim() ?? '';
+
+      if (title.isEmpty || slug.isEmpty) continue;
+      results.add(MangaSummary(id: slug, sourceId: id, title: title, coverUrl: cover));
     }
     return results;
   }
@@ -97,19 +119,16 @@ class MangaFireSource extends HttpMangaSource {
 
   @override
   Future<MangaDetails> getDetails(String mangaUrl) async {
-    final html = await fetchHtml('$baseUrl$mangaUrl');
+    // mangaUrl = slug (e.g. "one-piece.lp7ke") — add /manga/ prefix
+    final html = await fetchHtml('$baseUrl/manga/$mangaUrl');
     final doc = html_parser.parse(html);
 
     final title = doc.querySelector('.manga-name')?.text.trim() ??
         doc.querySelector('h1')?.text.trim() ?? '';
-    final cover =
-        doc.querySelector('.manga-poster img')?.attributes['src'] ??
-            doc.querySelector('.poster img')?.attributes['src'] ?? '';
+    final cover = doc.querySelector('.manga-poster img')?.attributes['src'] ??
+        doc.querySelector('.poster img')?.attributes['src'] ?? '';
     final synopsis = doc.querySelector('.synopsis p')?.text.trim() ??
-        doc
-            .querySelector('[class*="description"] p')
-            ?.text
-            .trim() ?? '';
+        doc.querySelector('[class*="description"] p')?.text.trim() ?? '';
     final statusEl = doc.querySelector('.manga-status .label') ??
         doc.querySelector('[class*="status"]');
     final status = _toStatus(statusEl?.text);
@@ -131,18 +150,25 @@ class MangaFireSource extends HttpMangaSource {
 
   @override
   Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
-    // mangaUrl = /manga/one-piece.lp7ke → extract slug for AJAX
+    // mangaUrl = slug (e.g. "one-piece.lp7ke")
+    // AJAX endpoint uses only the identifier AFTER the last dot:
+    //   "one-piece.lp7ke" → "lp7ke"
+    // (same as Mihon's MangaFire extension: manga.url.substringAfterLast("."))
+    final dotIdx = mangaUrl.lastIndexOf('.');
     final mangaId =
-        mangaUrl.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => '');
+        dotIdx >= 0 ? mangaUrl.substring(dotIdx + 1) : mangaUrl;
 
-    final response =
-        await client.get<dynamic>('/ajax/manga/$mangaId/chapter/en');
+    final response = await client.get<dynamic>(
+      '/ajax/manga/$mangaId/chapter/en',
+      options: Options(headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, */*',
+      }),
+    );
     final data = response.data;
     final String html;
     if (data is Map<String, dynamic>) {
-      // { "result": "<html>" }
-      html = data['result'] as String? ??
-          data['html'] as String? ?? '';
+      html = data['result'] as String? ?? data['html'] as String? ?? '';
     } else {
       html = data as String? ?? '';
     }
@@ -150,24 +176,27 @@ class MangaFireSource extends HttpMangaSource {
     final doc = html_parser.parse(html);
     final chapters = <ChapterSummary>[];
 
-    for (final li in doc.querySelectorAll('li[data-id], li')) {
+    var items = doc.querySelectorAll('li[data-id]');
+    if (items.isEmpty) items = doc.querySelectorAll('li');
+
+    for (final li in items) {
       final chId = li.attributes['data-id'];
       final a = li.querySelector('a');
       final href = a?.attributes['href'] ?? '';
       if (chId == null && href.isEmpty) continue;
-      final id = chId ?? href.split('/').last;
-      if (id.isEmpty) continue;
+      final chapterRef = chId ?? href.split('/').last;
+      if (chapterRef.isEmpty) continue;
       final rawTitle = a?.querySelector('.name')?.text.trim() ??
           a?.text.trim() ?? '';
       final numMatch = RegExp(r'\d+\.?\d*').firstMatch(rawTitle);
       final number = double.tryParse(numMatch?.group(0) ?? '') ?? 0.0;
       chapters.add(ChapterSummary(
-        id: id,
+        id: chapterRef,
         title: rawTitle.isNotEmpty
             ? rawTitle
             : 'Chapter ${numMatch?.group(0) ?? '?'}',
         number: number,
-        url: id,
+        url: chapterRef,
       ));
     }
 
@@ -178,14 +207,32 @@ class MangaFireSource extends HttpMangaSource {
   @override
   Future<List<String>> getPages(String chapterUrl,
       {bool dataSaver = false}) async {
-    final response = await client.get<dynamic>('/ajax/read/$chapterUrl');
+    final response = await client.get<dynamic>(
+      '/ajax/read/$chapterUrl',
+      options: Options(headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, */*',
+      }),
+    );
     final body = response.data as Map<String, dynamic>;
-    final result = body['result'] as Map<String, dynamic>;
-    final images = result['images'] as List<dynamic>;
-    // Each entry is [url, pageNumber, ""]
+    final result = body['result'];
+    if (result == null) return const [];
+    final resultMap = result as Map<String, dynamic>;
+    final images = resultMap['images'] as List<dynamic>? ?? const [];
+    // Each entry may be [url, pageNum, ""] or {"url": "...", "page": 1}
     return images.map((img) {
-      final arr = img as List<dynamic>;
-      return arr[0] as String;
-    }).toList();
+      final String rawUrl;
+      if (img is List<dynamic>) {
+        rawUrl = img[0] as String;
+      } else if (img is Map<String, dynamic>) {
+        rawUrl = img['url'] as String? ?? img['src'] as String? ?? '';
+      } else {
+        rawUrl = img as String? ?? '';
+      }
+      if (rawUrl.startsWith('http')) return rawUrl;
+      if (rawUrl.startsWith('//')) return 'https:$rawUrl';
+      if (rawUrl.startsWith('/')) return '$baseUrl$rawUrl';
+      return rawUrl;
+    }).where((url) => url.isNotEmpty).toList();
   }
 }

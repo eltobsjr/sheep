@@ -10,3 +10,6 @@ final activeDownloadsProvider =
 final completedDownloadsProvider =
     StreamProvider.autoDispose<List<CompletedDownloadEntry>>((ref) =>
         ref.watch(databaseProvider).watchCompletedDownloads());
+
+// Tracks whether the download queue is paused. Controlled by the UI.
+final downloadPausedProvider = StateProvider<bool>((ref) => false);

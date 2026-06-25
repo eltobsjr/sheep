@@ -39,6 +39,7 @@ class ReadingProgress extends Table {
   TextColumn get chapterId => text().references(Chapters, #id)();
   IntColumn get lastPage => integer()();
   DateTimeColumn get updatedAt => dateTime()();
+  BoolColumn get isRead => boolean().withDefault(const Constant(false))();
 
   @override
   // ignore: strict_raw_types

@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../data/db/app_database.dart';
 import '../../data/db/database_provider.dart';
+import '../../data/settings/settings_repository.dart';
 import '../../data/sources/source_registry.dart';
 
 // Watches the manga row from Drift by ID.
@@ -17,10 +18,14 @@ final mangaWatchProvider =
   return ref.watch(databaseProvider).watchManga(mangaId);
 });
 
-// Watches all chapters for a manga, ordered latest first.
+// Watches all chapters for a manga. Order follows chapterSort setting (desc = latest first).
 final chaptersWatchProvider =
     StreamProvider.autoDispose.family<List<Chapter>, String>((ref, mangaId) {
-  return ref.watch(databaseProvider).watchChapters(mangaId);
+  final sort = ref.watch(settingsProvider).chapterSort;
+  return ref
+      .watch(databaseProvider)
+      .watchChapters(mangaId)
+      .map((list) => sort == 'asc' ? list.reversed.toList() : list);
 });
 
 // Fetches manga detail + chapters from source, saves to DB.
@@ -99,4 +104,11 @@ final toggleLibraryProvider =
     Provider.autoDispose.family<Future<void> Function(bool), String>(
   (ref, mangaId) => (bool inLibrary) =>
       ref.read(databaseProvider).toggleLibrary(mangaId, inLibrary: inLibrary),
+);
+
+// Watches chapterId → isRead map for a manga's chapters.
+final chapterReadMapProvider =
+    StreamProvider.autoDispose.family<Map<String, bool>, String>(
+  (ref, mangaId) =>
+      ref.watch(databaseProvider).watchChapterReadMap(mangaId),
 );

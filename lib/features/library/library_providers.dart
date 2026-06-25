@@ -10,3 +10,15 @@ final libraryMangasProvider = StreamProvider<List<Manga>>((ref) {
 final lastReadProvider = StreamProvider<LastReadEntry?>((ref) {
   return ref.watch(databaseProvider).watchLastRead();
 });
+
+final recentlyReadProvider = StreamProvider<List<LastReadEntry>>((ref) {
+  return ref.watch(databaseProvider).watchRecentlyRead();
+});
+
+final libraryProgressProvider =
+    StreamProvider<Map<String, MangaProgressEntry>>((ref) {
+  return ref
+      .watch(databaseProvider)
+      .watchLibraryProgress()
+      .map((list) => {for (final e in list) e.mangaId: e});
+});

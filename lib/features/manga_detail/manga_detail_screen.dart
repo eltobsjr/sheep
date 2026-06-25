@@ -10,7 +10,9 @@ import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/app_database.dart';
+import '../../data/db/database_provider.dart';
 import '../../data/download/download_provider.dart';
+import '../../data/settings/settings_repository.dart';
 import 'manga_detail_providers.dart';
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -108,11 +110,27 @@ class _DetailBody extends ConsumerWidget {
     final inLibrary = manga?.inLibrary ?? false;
     final toggle = ref.read(toggleLibraryProvider(mangaId));
     final coverPath = manga?.coverPath ?? '';
+    final chapterSort = ref.watch(settingsProvider).chapterSort;
 
     final chapters = chaptersAsync.valueOrNull ?? const [];
-    final firstChapter = chapters.isNotEmpty
-        ? chapters.reduce((a, b) => a.number < b.number ? a : b)
-        : null;
+    // Always sort ascending by number to find first/continue chapter correctly.
+    final sortedAsc = [...chapters]..sort((a, b) => a.number.compareTo(b.number));
+    final firstChapter = sortedAsc.isNotEmpty ? sortedAsc.first : null;
+
+    // Determine the chapter to start/continue reading.
+    final readMap =
+        ref.watch(chapterReadMapProvider(mangaId)).valueOrNull ?? const {};
+    final lastReadNum = chapters.fold<double>(
+      -1,
+      (mx, ch) => (readMap[ch.id] == true && ch.number > mx) ? ch.number : mx,
+    );
+    final hasReadProgress = lastReadNum >= 0;
+    final continueChapter = hasReadProgress
+        ? sortedAsc.firstWhere(
+            (ch) => ch.number > lastReadNum && (readMap[ch.id] != true),
+            orElse: () => firstChapter!,
+          )
+        : firstChapter;
 
     final topPad = MediaQuery.of(context).padding.top;
     final isLoading = fetchAsync.isLoading && chapters.isEmpty;
@@ -170,7 +188,7 @@ class _DetailBody extends ConsumerWidget {
                           ),
                         ),
                         const Text(
-                          'Voltar',
+                          'Back',
                           style: TextStyle(
                             fontSize: 13,
                             height: 1,
@@ -357,13 +375,13 @@ class _DetailBody extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // "▶ Read Ch. X"
+                      // "▶ Read Ch. X" / "▶ Continue Ch. X"
                       Expanded(
                         child: GestureDetector(
-                          onTap: firstChapter == null
+                          onTap: continueChapter == null
                               ? null
                               : () => context.push(
-                                    '/reader/$mangaId/${firstChapter.id}',
+                                    '/reader/$mangaId/${continueChapter.id}',
                                   ),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -375,8 +393,10 @@ class _DetailBody extends ConsumerWidget {
                             ),
                             alignment: Alignment.center,
                             child: Text(
-                              firstChapter != null
-                                  ? '▶ Read Ch. ${_fmtNum(firstChapter.number)}'
+                              continueChapter != null
+                                  ? hasReadProgress
+                                      ? '▶ Continue Ch. ${_fmtNum(continueChapter.number)}'
+                                      : '▶ Read Ch. ${_fmtNum(continueChapter.number)}'
                                   : '▶ Read',
                               style: TextStyle(
                                 fontFamily: fontDisplay,
@@ -415,25 +435,42 @@ class _DetailBody extends ConsumerWidget {
                           color: c.slate,
                         ),
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            'Latest first',
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1,
-                              color: c.slate,
-                            ),
+                      GestureDetector(
+                        onTap: () {
+                          final n = ref.read(settingsProvider.notifier);
+                          n.setChapterSort(
+                              chapterSort == 'desc' ? 'asc' : 'desc');
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
+                          child: Row(
+                            children: [
+                              Text(
+                                chapterSort == 'asc'
+                                    ? 'Oldest first'
+                                    : 'Latest first',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1,
+                                  color: c.slate,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              SvgPicture.string(
+                                chapterSort == 'asc'
+                                    ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
+                                        ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
+                                        '<path d="M4 7l2-2 2 2"/></svg>'
+                                    : '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
+                                        ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
+                                        '<path d="M4 5l2 2 2-2"/></svg>',
+                                width: 12,
+                                height: 12,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          SvgPicture.string(
-                            '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
-                            ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
-                            '<path d="M4 5l2 2 2-2"/></svg>',
-                            width: 12,
-                            height: 12,
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -449,27 +486,53 @@ class _DetailBody extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Center(
-                      child: Text(
-                        'Erro ao buscar capítulos.\nVerifique sua conexão.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.5,
-                          color: c.slate,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Erro ao buscar capítulos.\nVerifique sua conexão.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.5,
+                              color: c.slate,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            fetchAsync.error.toString(),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.4,
+                              color: c.slate,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
                 else
                   ...chapters.map((ch) => _ChapterRow(
                         chapter: ch,
-                        onTap: () =>
-                            context.push('/reader/$mangaId/${ch.id}'),
+                        isRead: readMap[ch.id] ?? false,
+                        onTap: () => context.push('/reader/$mangaId/${ch.id}'),
                         onDownload: ch.isDownloaded
                             ? null
                             : () => ref
                                 .read(downloadServiceProvider)
                                 .queue(ch.id),
+                        onMarkRead: (isRead) => ref
+                            .read(databaseProvider)
+                            .markChapterRead(ch.id, isRead: isRead),
+                        onMarkAllPreviousRead: () {
+                          final db = ref.read(databaseProvider);
+                          for (final c in chapters) {
+                            if (c.number <= ch.number) {
+                              db.markChapterRead(c.id, isRead: true);
+                            }
+                          }
+                        },
                       )),
 
                 const SizedBox(height: 20),
@@ -561,13 +624,84 @@ class _Chip extends StatelessWidget {
 class _ChapterRow extends StatelessWidget {
   const _ChapterRow({
     required this.chapter,
+    required this.isRead,
     required this.onTap,
     this.onDownload,
+    this.onMarkRead,
+    this.onMarkAllPreviousRead,
   });
 
   final Chapter chapter;
+  final bool isRead;
   final VoidCallback onTap;
   final VoidCallback? onDownload;
+  final void Function(bool)? onMarkRead;
+  final VoidCallback? onMarkAllPreviousRead;
+
+  void _showActions(BuildContext context) {
+    final c = SheepColors.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: c.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final bottomPad = MediaQuery.of(ctx).padding.bottom;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: c.wool,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                isRead
+                    ? Icons.radio_button_unchecked
+                    : Icons.check_circle_outline,
+                color: c.ink,
+              ),
+              title: Text(
+                isRead ? 'Mark as unread' : 'Mark as read',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                  color: c.ink,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                onMarkRead?.call(!isRead);
+              },
+            ),
+            if (onMarkAllPreviousRead != null)
+              ListTile(
+                leading: Icon(Icons.done_all, color: c.ink),
+                title: Text(
+                  'Mark Ch. 1 – ${_numStr(chapter.number)} as read',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    color: c.ink,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onMarkAllPreviousRead!();
+                },
+              ),
+            SizedBox(height: bottomPad + 8),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -575,9 +709,11 @@ class _ChapterRow extends StatelessWidget {
     final numStr = chapter.number == chapter.number.truncateToDouble()
         ? chapter.number.toInt().toString()
         : chapter.number.toString();
+    final textColor = isRead ? c.slate : c.ink;
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: () => _showActions(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
@@ -588,6 +724,22 @@ class _ChapterRow extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // Read indicator dot
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isRead
+                    ? Colors.transparent
+                    : c.ink,
+                border: Border.all(
+                  color: isRead ? c.slate.withValues(alpha: 0.4) : c.ink,
+                  width: 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Chapter number
             SizedBox(
               width: 26,
@@ -602,7 +754,7 @@ class _ChapterRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             // Title + date
             Expanded(
               child: Column(
@@ -614,7 +766,7 @@ class _ChapterRow extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       fontSize: 13,
                       height: 1.2,
-                      color: c.ink,
+                      color: textColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -648,6 +800,9 @@ class _ChapterRow extends StatelessWidget {
       ),
     );
   }
+
+  String _numStr(double n) =>
+      n == n.truncateToDouble() ? n.toInt().toString() : n.toString();
 
   String _relativeTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);

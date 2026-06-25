@@ -4,6 +4,7 @@ import 'mangadex/mangadex_source.dart';
 import 'mangafire/mangafire_source.dart';
 import 'mangaflix/mangaflix_source.dart';
 import 'mangalivre/mangalivre_source.dart';
+import 'taiyo/taiyo_source.dart';
 import 'weebcentral/weeb_central_source.dart';
 
 // All sources compiled into the APK.
@@ -18,14 +19,13 @@ final List<MangaSource> allSources = [
 
   // ── Madara (WordPress WP-Manga) — PT-BR ───────────────────────────────────
   MangaOnlineSource(),
-  LeitorDeMangasSource(),
-  MangasBrasukaSource(),
-  NinjaScanSource(),
-  MangaDashSource(),
 
   // ── HTML scrapers — EN ────────────────────────────────────────────────────
   WeebCentralSource(),
   MangaFireSource(),
+
+  // ── Next.js tRPC — PT-BR ─────────────────────────────────────────────────
+  TaiyoSource(),
 ];
 
 // Look up a source by its id.

@@ -18,11 +18,14 @@ class DownloadService {
 
   final AppDatabase _db;
   bool _running = false;
+  bool _isPaused = false;
+  CancelToken? _cancelToken;
+  String? _currentChapterId;
+
+  bool get isPaused => _isPaused;
 
   Future<void> queue(String chapterId) async {
     await _db.queueDownload(chapterId);
-    // Register a background task so downloads survive the app going to background.
-    // ExistingWorkPolicy.keep: no-op if a task is already scheduled.
     await Workmanager().registerOneOffTask(
       kDownloadTaskName,
       kDownloadTaskName,
@@ -32,6 +35,36 @@ class DownloadService {
     unawaited(_startIfIdle());
   }
 
+  void pause() {
+    _isPaused = true;
+    // Cancel the current in-flight request — it will be re-queued automatically.
+    _cancelToken?.cancel('paused');
+  }
+
+  void resume() {
+    _isPaused = false;
+    unawaited(_startIfIdle());
+  }
+
+  // Cancels and removes a specific chapter from the queue.
+  Future<void> cancel(String chapterId) async {
+    if (chapterId == _currentChapterId) {
+      _cancelToken?.cancel('cancelled');
+    }
+    await _db.cancelDownload(chapterId);
+    // Clean up any partial tmp directory.
+    try {
+      final chapter = await _db.watchChapterById(chapterId).first;
+      if (chapter != null) {
+        final docDir = await getApplicationDocumentsDirectory();
+        final tmpPath =
+            '${docDir.path}/manga/${chapter.mangaId}/${chapterId}_tmp';
+        final tmpDir = Directory(tmpPath);
+        if (tmpDir.existsSync()) await tmpDir.delete(recursive: true);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _startIfIdle() => processQueue();
 
   // Public so the background worker (download_worker.dart) can call this.
@@ -39,20 +72,42 @@ class DownloadService {
     Future<void> Function(String mangaTitle, String chapterTitle)? onChapterDone,
     Future<void> Function(String chapterTitle)? onChapterFailed,
   }) async {
-    if (_running) return;
+    if (_running || _isPaused) return;
     _running = true;
     try {
       while (true) {
+        if (_isPaused) break;
         final next = await _db.nextQueuedDownload();
         if (next == null) break;
+        _currentChapterId = next.chapterId;
+        _cancelToken = CancelToken();
         try {
-          final info = await _downloadChapter(next.chapterId);
+          final info =
+              await _downloadChapter(next.chapterId, _cancelToken!);
           if (onChapterDone != null && info != null) {
             await onChapterDone(info.$1, info.$2);
           }
+        } on DioException catch (e) {
+          if (CancelToken.isCancel(e)) {
+            if (e.message == 'paused') {
+              // Put back to queued so it's picked up on resume.
+              await _db.setDownloadStatus(next.chapterId, 'queued');
+            }
+            // If 'cancelled' or other cancel reason: already removed by cancel().
+          } else {
+            await _db.markDownloadFailed(next.chapterId);
+            if (onChapterFailed != null) {
+              await onChapterFailed(next.chapterId);
+            }
+          }
         } catch (_) {
           await _db.markDownloadFailed(next.chapterId);
-          if (onChapterFailed != null) await onChapterFailed(next.chapterId);
+          if (onChapterFailed != null) {
+            await onChapterFailed(next.chapterId);
+          }
+        } finally {
+          _currentChapterId = null;
+          _cancelToken = null;
         }
       }
     } finally {
@@ -60,7 +115,10 @@ class DownloadService {
     }
   }
 
-  Future<(String, String)?> _downloadChapter(String chapterId) async {
+  Future<(String, String)?> _downloadChapter(
+    String chapterId,
+    CancelToken cancelToken,
+  ) async {
     final chapter = await _db.watchChapterById(chapterId).first;
     if (chapter == null) return null;
 
@@ -92,6 +150,7 @@ class DownloadService {
         final resp = await source.client.get<List<int>>(
           urls[i],
           options: Options(responseType: ResponseType.bytes),
+          cancelToken: cancelToken,
         );
         await file.writeAsBytes(resp.data ?? []);
       } else {
@@ -99,6 +158,7 @@ class DownloadService {
         final resp = await dio.get<List<int>>(
           urls[i],
           options: Options(responseType: ResponseType.bytes),
+          cancelToken: cancelToken,
         );
         await file.writeAsBytes(resp.data ?? []);
         dio.close();
@@ -108,7 +168,7 @@ class DownloadService {
       await _db.updateDownloadProgress(chapterId, progress);
     }
 
-    // Atomic: rename tmp → final only after all pages succeed
+    // Atomic: rename tmp → final only after all pages succeed.
     final finalDir = Directory(finalPath);
     if (finalDir.existsSync()) await finalDir.delete(recursive: true);
     await tmpDir.rename(finalPath);

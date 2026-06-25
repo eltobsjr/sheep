@@ -36,6 +36,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   int _currentPage = 0;
   bool _overlayVisible = true;
   Timer? _overlayTimer;
+  final _pageViewerKey = GlobalKey<_PageViewerState>();
 
   @override
   void initState() {
@@ -77,6 +78,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  void _showPagePicker(BuildContext context, int totalPages) {
+    if (totalPages <= 1) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: charcoal,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _PagePickerSheet(
+        currentPage: _currentPage,
+        totalPages: totalPages,
+        onSelect: (page) {
+          Navigator.pop(ctx);
+          _pageViewerKey.currentState?.jumpToPage(page);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
@@ -85,67 +105,121 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
     final chapterAsync = ref.watch(readerChapterProvider(widget.chapterId));
     final pagesAsync = ref.watch(readerPagesProvider(widget.chapterId));
+    final initialPageAsync =
+        ref.watch(readerInitialPageProvider(widget.chapterId));
     final mangaTitle = ref.watch(_mangaTitleProvider(widget.mangaId));
+    final nextChapterId = ref.watch(
+      nextChapterIdProvider((widget.mangaId, widget.chapterId)),
+    );
 
-    return Scaffold(
-      backgroundColor: charcoal,
-      body: pagesAsync.when(
-        loading: () => const Center(child: WoolLoading()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Erro ao carregar páginas',
-                style: TextStyle(color: paper, fontSize: 14),
+    return PopScope(
+      child: Scaffold(
+        backgroundColor: charcoal,
+        body: _buildBody(
+          pagesAsync: pagesAsync,
+          initialPageAsync: initialPageAsync,
+          chapterAsync: chapterAsync,
+          mangaTitle: mangaTitle,
+          isScroll: isScroll,
+          isRtl: isRtl,
+          nextChapterId: nextChapterId,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody({
+    required AsyncValue<List<PageImage>> pagesAsync,
+    required AsyncValue<int> initialPageAsync,
+    required AsyncValue<Chapter?> chapterAsync,
+    required String? mangaTitle,
+    required bool isScroll,
+    required bool isRtl,
+    String? nextChapterId,
+  }) {
+    if (pagesAsync.isLoading || initialPageAsync.isLoading) {
+      return const Center(child: WoolLoading());
+    }
+
+    if (pagesAsync.hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Erro ao carregar páginas',
+              style: TextStyle(color: paper, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                pagesAsync.error.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: slate, fontSize: 10),
               ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () => context.pop(),
-                child: const Text(
-                  '← Voltar',
-                  style: TextStyle(color: slate, fontSize: 13),
-                ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => context.pop(),
+              child: const Text(
+                '← Voltar',
+                style: TextStyle(color: slate, fontSize: 13),
               ),
-            ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    final pages = pagesAsync.requireValue;
+    final rawInitial = initialPageAsync.valueOrNull ?? 0;
+    final initialPage =
+        rawInitial.clamp(0, pages.isEmpty ? 0 : pages.length - 1);
+    final chapter = chapterAsync.valueOrNull;
+    final chapterLabel = _chapterLabel(mangaTitle, chapter);
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Page viewer — tap on it toggles overlay
+        GestureDetector(
+          onTap: _toggleOverlay,
+          behavior: HitTestBehavior.translucent,
+          child: _PageViewer(
+            key: _pageViewerKey,
+            pages: pages,
+            isScroll: isScroll,
+            isRtl: isRtl,
+            initialPage: initialPage,
+            onPageChanged: (i) => _onPageChanged(i, pages.length),
           ),
         ),
-        data: (pages) {
-          final chapter = chapterAsync.valueOrNull;
-          final chapterLabel = _chapterLabel(mangaTitle, chapter);
 
-          return GestureDetector(
-            onTap: _toggleOverlay,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // ── Page viewer ────────────────────────────────────────────
-                _PageViewer(
-                  pages: pages,
-                  isScroll: isScroll,
-                  isRtl: isRtl,
-                  onPageChanged: (i) => _onPageChanged(i, pages.length),
-                ),
-
-                // ── Overlay ─────────────────────────────────────────────────
-                AnimatedOpacity(
-                  opacity: _overlayVisible ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: IgnorePointer(
-                    ignoring: !_overlayVisible,
-                    child: _Overlay(
-                      chapterLabel: chapterLabel,
-                      currentPage: _currentPage + 1,
-                      totalPages: pages.length,
-                      onBack: () => context.pop(),
-                    ),
-                  ),
-                ),
-              ],
+        // Overlay — separate from the page viewer tap zone
+        AnimatedOpacity(
+          opacity: _overlayVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !_overlayVisible,
+            child: _Overlay(
+              chapterLabel: chapterLabel,
+              currentPage: _currentPage + 1,
+              totalPages: pages.length,
+              isScroll: isScroll,
+              onBack: () => context.pop(),
+              onZoomIn: () => _pageViewerKey.currentState?.zoomIn(),
+              onZoomOut: () => _pageViewerKey.currentState?.zoomOut(),
+              onPageTap: () => _showPagePicker(context, pages.length),
+              onNextChapter: nextChapterId == null
+                  ? null
+                  : () => context.pushReplacement(
+                        '/reader/${widget.mangaId}/$nextChapterId',
+                      ),
             ),
-          );
-        },
-      ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -169,12 +243,15 @@ class _PageViewer extends StatefulWidget {
     required this.pages,
     required this.isScroll,
     required this.isRtl,
+    required this.initialPage,
     required this.onPageChanged,
+    super.key,
   });
 
   final List<PageImage> pages;
   final bool isScroll;
   final bool isRtl;
+  final int initialPage;
   final void Function(int) onPageChanged;
 
   @override
@@ -182,18 +259,41 @@ class _PageViewer extends StatefulWidget {
 }
 
 class _PageViewerState extends State<_PageViewer> {
-  final ScrollController _scrollCtrl = ScrollController();
+  late final ScrollController _scrollCtrl;
+  late final ExtendedPageController _pageController;
+  int _currentPage = 0;
+
+  // Per-page GlobalKeys for controlling gesture state (zoom).
+  final Map<int, GlobalKey<ExtendedImageGestureState>> _gestureKeys = {};
 
   @override
   void initState() {
     super.initState();
+    _currentPage = widget.initialPage;
+    _pageController =
+        ExtendedPageController(initialPage: widget.initialPage);
+    _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
+
+    // Scroll mode: jump to saved position after first layout.
+    if (widget.isScroll && widget.initialPage > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollCtrl.hasClients) return;
+        final max = _scrollCtrl.position.maxScrollExtent;
+        if (max > 0 && widget.pages.length > 1) {
+          _scrollCtrl.jumpTo(
+            max * widget.initialPage / (widget.pages.length - 1),
+          );
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -201,17 +301,70 @@ class _PageViewerState extends State<_PageViewer> {
     if (!_scrollCtrl.hasClients) return;
     final max = _scrollCtrl.position.maxScrollExtent;
     if (max <= 0) return;
-    final page = (_scrollCtrl.offset / max * (widget.pages.length - 1)).round()
-        .clamp(0, widget.pages.length - 1);
-    widget.onPageChanged(page);
+    final page =
+        (_scrollCtrl.offset / max * (widget.pages.length - 1)).round()
+            .clamp(0, widget.pages.length - 1);
+    if (page != _currentPage) {
+      setState(() => _currentPage = page);
+      widget.onPageChanged(page);
+    }
   }
 
-  Widget _buildImage(PageImage page) {
+  GlobalKey<ExtendedImageGestureState> _gestureKeyFor(int index) =>
+      _gestureKeys.putIfAbsent(
+          index, () => GlobalKey<ExtendedImageGestureState>());
+
+  // Zooms in on the current page (paged mode only).
+  void zoomIn() {
+    if (widget.isScroll) return;
+    final state = _gestureKeys[_currentPage]?.currentState;
+    if (state == null) return;
+    final scale = state.gestureDetails?.totalScale ?? 1.0;
+    if (scale < 1.5) state.handleDoubleTap();
+  }
+
+  // Zooms out on the current page (paged mode only).
+  void zoomOut() {
+    if (widget.isScroll) return;
+    final state = _gestureKeys[_currentPage]?.currentState;
+    if (state == null) return;
+    final scale = state.gestureDetails?.totalScale ?? 1.0;
+    if (scale >= 1.5) state.handleDoubleTap();
+  }
+
+  // Jumps to the given 0-based page index.
+  void jumpToPage(int page) {
+    final clamped = page.clamp(0, widget.pages.length - 1);
+    if (widget.isScroll) {
+      if (_scrollCtrl.hasClients) {
+        final max = _scrollCtrl.position.maxScrollExtent;
+        if (max > 0 && widget.pages.length > 1) {
+          _scrollCtrl.animateTo(
+            max * clamped / (widget.pages.length - 1),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      }
+    } else {
+      _pageController.animateToPage(
+        clamped,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Widget _buildImage(PageImage page, int index) {
+    final key = widget.isScroll ? null : _gestureKeyFor(index);
     if (page is NetworkPageImage) {
       return ExtendedImage.network(
         page.url,
+        key: key,
         fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
-        mode: widget.isScroll ? ExtendedImageMode.none : ExtendedImageMode.gesture,
+        mode: widget.isScroll
+            ? ExtendedImageMode.none
+            : ExtendedImageMode.gesture,
         initGestureConfigHandler: widget.isScroll
             ? null
             : (_) => GestureConfig(
@@ -223,8 +376,11 @@ class _PageViewerState extends State<_PageViewer> {
     }
     return ExtendedImage.file(
       (page as FilePageImage).file,
+      key: key,
       fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
-      mode: widget.isScroll ? ExtendedImageMode.none : ExtendedImageMode.gesture,
+      mode: widget.isScroll
+          ? ExtendedImageMode.none
+          : ExtendedImageMode.gesture,
       initGestureConfigHandler: widget.isScroll
           ? null
           : (_) => GestureConfig(
@@ -238,40 +394,52 @@ class _PageViewerState extends State<_PageViewer> {
   @override
   Widget build(BuildContext context) {
     if (widget.isScroll) {
-      // Scroll mode is always top-to-bottom in reading order.
-      // RTL direction only affects paged mode (handled via PageView.reverse).
       return ListView.builder(
         controller: _scrollCtrl,
         physics: const BouncingScrollPhysics(),
         itemCount: widget.pages.length,
-        itemBuilder: (context, index) => _buildImage(widget.pages[index]),
+        itemBuilder: (context, index) =>
+            _buildImage(widget.pages[index], index),
       );
     }
 
     return ExtendedImageGesturePageView.builder(
       itemCount: widget.pages.length,
-      controller: ExtendedPageController(),
+      controller: _pageController,
       reverse: widget.isRtl,
-      onPageChanged: widget.onPageChanged,
-      itemBuilder: (context, index) => _buildImage(widget.pages[index]),
+      onPageChanged: (i) {
+        setState(() => _currentPage = i);
+        widget.onPageChanged(i);
+      },
+      itemBuilder: (context, index) => _buildImage(widget.pages[index], index),
     );
   }
 }
 
-// ── Overlay (chapter chip + page counter + back button) ───────────────────────
+// ── Overlay ───────────────────────────────────────────────────────────────────
 
 class _Overlay extends StatelessWidget {
   const _Overlay({
     required this.chapterLabel,
     required this.currentPage,
     required this.totalPages,
+    required this.isScroll,
     required this.onBack,
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onPageTap,
+    this.onNextChapter,
   });
 
   final String chapterLabel;
   final int currentPage;
   final int totalPages;
+  final bool isScroll;
   final VoidCallback onBack;
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onPageTap;
+  final VoidCallback? onNextChapter;
 
   @override
   Widget build(BuildContext context) {
@@ -315,8 +483,8 @@ class _Overlay extends StatelessWidget {
         // Chapter title chip (top center)
         Positioned(
           top: topPad + 10,
-          left: 0,
-          right: 0,
+          left: 60,
+          right: 60,
           child: Center(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -332,39 +500,88 @@ class _Overlay extends StatelessWidget {
                   height: 1,
                   color: paper,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
         ),
 
-        // Page counter pill (bottom center)
+        // Zoom buttons (bottom left, paged mode only)
+        if (!isScroll)
+          Positioned(
+            left: 16,
+            bottom: bottomPad + 28,
+            child: Row(
+              children: [
+                _OverlayRoundBtn(label: '−', onTap: onZoomOut),
+                const SizedBox(width: 8),
+                _OverlayRoundBtn(label: '+', onTap: onZoomIn),
+              ],
+            ),
+          ),
+
+        // Page counter pill (bottom center, tappable → page picker)
         Positioned(
-          bottom: bottomPad + 34,
+          bottom: bottomPad + 28,
           left: 0,
           right: 0,
           child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-              decoration: const BoxDecoration(
-                color: Color(0xB80A0A0A),
-                borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
-              ),
-              child: Text(
-                '$currentPage / $totalPages',
-                style: const TextStyle(
-                  fontFamily: fontMono,
-                  fontSize: 14,
-                  height: 1,
-                  color: paper,
+            child: GestureDetector(
+              onTap: onPageTap,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                decoration: const BoxDecoration(
+                  color: Color(0xB80A0A0A),
+                  borderRadius:
+                      BorderRadius.all(Radius.circular(radiusPill)),
+                ),
+                child: Text(
+                  '$currentPage / $totalPages',
+                  style: const TextStyle(
+                    fontFamily: fontMono,
+                    fontSize: 14,
+                    height: 1,
+                    color: paper,
+                  ),
                 ),
               ),
             ),
           ),
         ),
 
+        // "Next chapter →" button (bottom right, on last page only)
+        if (onNextChapter != null && currentPage == totalPages)
+          Positioned(
+            right: 16,
+            bottom: bottomPad + 28,
+            child: GestureDetector(
+              onTap: onNextChapter,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: const BoxDecoration(
+                  color: Color(0xB80A0A0A),
+                  borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+                ),
+                child: const Text(
+                  'Next →',
+                  style: TextStyle(
+                    fontFamily: fontMono,
+                    fontSize: 13,
+                    height: 1,
+                    color: paper,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
         // Gesture bar
         Positioned(
-          bottom: bottomPad + 9,
+          bottom: bottomPad + 4,
           left: 0,
           right: 0,
           child: Center(
@@ -383,13 +600,149 @@ class _Overlay extends StatelessWidget {
   }
 }
 
-// Reads manga title from DB for the reader overlay.
-final _mangaTitleProvider = Provider.autoDispose.family<String?, String>(
-  (ref, mangaId) {
-    final mangaAsync = ref.watch(
-      StreamProvider.autoDispose.family<Manga?, String>((ref, id) =>
-          ref.watch(databaseProvider).watchManga(id))(mangaId),
+// ── Small circular overlay button ─────────────────────────────────────────────
+
+class _OverlayRoundBtn extends StatelessWidget {
+  const _OverlayRoundBtn({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: const BoxDecoration(
+          color: Color(0xB80A0A0A),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: paper,
+            fontSize: 22,
+            height: 1,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
+      ),
     );
-    return mangaAsync.valueOrNull?.title;
-  },
+  }
+}
+
+// ── Page picker bottom sheet ──────────────────────────────────────────────────
+
+class _PagePickerSheet extends StatefulWidget {
+  const _PagePickerSheet({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onSelect,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final void Function(int) onSelect;
+
+  @override
+  State<_PagePickerSheet> createState() => _PagePickerSheetState();
+}
+
+class _PagePickerSheetState extends State<_PagePickerSheet> {
+  late double _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = (widget.currentPage + 1).toDouble().clamp(
+          1,
+          widget.totalPages.toDouble(),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.totalPages;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0x38FAFAFA),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Page ${_value.round()} of $total',
+            style: const TextStyle(
+              fontFamily: fontMono,
+              fontSize: 14,
+              height: 1,
+              color: paper,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: paper,
+              inactiveTrackColor: const Color(0x38FAFAFA),
+              thumbColor: paper,
+              overlayColor: const Color(0x22FAFAFA),
+            ),
+            child: Slider(
+              value: _value,
+              min: 1,
+              max: total.toDouble(),
+              divisions: total > 1 ? total - 1 : 1,
+              onChanged: (v) => setState(() => _value = v),
+            ),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () => widget.onSelect(_value.round() - 1),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+              decoration: BoxDecoration(
+                color: paper,
+                borderRadius: BorderRadius.circular(radiusPill),
+              ),
+              child: const Text(
+                'Go',
+                style: TextStyle(
+                  fontFamily: fontDisplay,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  height: 1,
+                  color: ink,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Manga title provider ──────────────────────────────────────────────────────
+
+final _watchMangaProvider =
+    StreamProvider.autoDispose.family<Manga?, String>(
+  (ref, id) => ref.watch(databaseProvider).watchManga(id),
+);
+
+final _mangaTitleProvider = Provider.autoDispose.family<String?, String>(
+  (ref, mangaId) =>
+      ref.watch(_watchMangaProvider(mangaId)).valueOrNull?.title,
 );

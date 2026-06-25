@@ -12,16 +12,48 @@ import '../../data/db/app_database.dart';
 import '../../data/sources/source_registry.dart';
 import 'library_providers.dart';
 
+
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-class LibraryScreen extends ConsumerWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  final _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(_onSearch);
+  }
+
+  void _onSearch() => setState(() {});
+
+  @override
+  void dispose() {
+    _searchCtrl.removeListener(_onSearch);
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchCtrl.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = SheepColors.of(context);
     final mangasAsync = ref.watch(libraryMangasProvider);
-    final lastReadAsync = ref.watch(lastReadProvider);
+    final recentlyReadAsync = ref.watch(recentlyReadProvider);
+    final progressAsync = ref.watch(libraryProgressProvider);
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -29,17 +61,33 @@ class LibraryScreen extends ConsumerWidget {
         child: mangasAsync.when(
           loading: () => const Center(child: WoolLoading()),
           error: (e, _) => _LibraryHeader(showSearch: false, c: c),
-          data: (mangas) => mangas.isEmpty
-              ? _EmptyState(onBrowse: () => context.go('/browse'), c: c)
-              : _FilledState(
-                  mangas: mangas,
-                  lastRead: lastReadAsync.valueOrNull,
-                  onMangaTap: (id) => context.go('/manga/$id'),
-                  onReadTap: (mangaId, chapterId) =>
-                      context.go('/reader/$mangaId/$chapterId'),
-                  onSearchTap: () => context.go('/browse/search'),
-                  c: c,
-                ),
+          data: (mangas) {
+            if (mangas.isEmpty) {
+              return _EmptyState(
+                  onBrowse: () => context.go('/browse'), c: c);
+            }
+            final query = _searchCtrl.text.trim().toLowerCase();
+            final filtered = query.isEmpty
+                ? mangas
+                : mangas
+                    .where((m) =>
+                        m.title.toLowerCase().contains(query))
+                    .toList();
+            return _FilledState(
+              mangas: filtered,
+              totalCount: mangas.length,
+              recentlyRead:
+                  _searching ? const [] : (recentlyReadAsync.valueOrNull ?? const []),
+              progress: progressAsync.valueOrNull ?? const {},
+              searching: _searching,
+              searchCtrl: _searchCtrl,
+              onSearchToggle: _toggleSearch,
+              onMangaTap: (id) => context.push('/manga/$id'),
+              onReadTap: (mangaId, chapterId) =>
+                  context.push('/reader/$mangaId/$chapterId'),
+              c: c,
+            );
+          },
         ),
       ),
     );
@@ -145,18 +193,26 @@ class _EmptyState extends StatelessWidget {
 class _FilledState extends StatelessWidget {
   const _FilledState({
     required this.mangas,
-    required this.lastRead,
+    required this.totalCount,
+    required this.recentlyRead,
+    required this.progress,
+    required this.searching,
+    required this.searchCtrl,
+    required this.onSearchToggle,
     required this.onMangaTap,
     required this.onReadTap,
-    required this.onSearchTap,
     required this.c,
   });
 
   final List<Manga> mangas;
-  final LastReadEntry? lastRead;
+  final int totalCount;
+  final List<LastReadEntry> recentlyRead;
+  final Map<String, MangaProgressEntry> progress;
+  final bool searching;
+  final TextEditingController searchCtrl;
+  final VoidCallback onSearchToggle;
   final void Function(String mangaId) onMangaTap;
   final void Function(String mangaId, String chapterId) onReadTap;
-  final VoidCallback onSearchTap;
   final SheepColors c;
 
   @override
@@ -169,76 +225,144 @@ class _FilledState extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Library',
-                  style: TextStyle(
-                    fontFamily: fontDisplay,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 28,
-                    height: 1.1,
-                    color: c.ink,
+                if (searching) ...[
+                  Expanded(
+                    child: TextField(
+                      controller: searchCtrl,
+                      autofocus: true,
+                      style: TextStyle(
+                        fontSize: 18,
+                        height: 1.2,
+                        color: c.ink,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Search library…',
+                        hintStyle:
+                            TextStyle(fontSize: 18, color: c.slate),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
                   ),
-                ),
-                GestureDetector(
-                  onTap: onSearchTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
+                  GestureDetector(
+                    onTap: onSearchToggle,
+                    behavior: HitTestBehavior.opaque,
                     child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: c.wool,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: SvgPicture.string(
-                      '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"'
-                      ' stroke="#0A0A0A" stroke-width="1.5" stroke-linecap="round">'
-                      '<circle cx="7" cy="7" r="5"/>'
-                      '<path d="M11 11l3 3"/>'
-                      '</svg>',
-                      width: 16,
-                      height: 16,
-                      colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
-                    ),
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: c.wool,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: SvgPicture.string(
+                          '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
+                          ' stroke="#0A0A0A" stroke-width="1.5" stroke-linecap="round">'
+                          '<line x1="2" y1="2" x2="10" y2="10"/>'
+                          '<line x1="10" y1="2" x2="2" y2="10"/>'
+                          '</svg>',
+                          width: 12,
+                          height: 12,
+                          colorFilter:
+                              ColorFilter.mode(c.ink, BlendMode.srcIn),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  Expanded(
+                    child: Text(
+                      'Library',
+                      style: TextStyle(
+                        fontFamily: fontDisplay,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 28,
+                        height: 1.1,
+                        color: c.ink,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: onSearchToggle,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: c.wool,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: SvgPicture.string(
+                          '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"'
+                          ' stroke="#0A0A0A" stroke-width="1.5" stroke-linecap="round">'
+                          '<circle cx="7" cy="7" r="5"/>'
+                          '<path d="M11 11l3 3"/>'
+                          '</svg>',
+                          width: 16,
+                          height: 16,
+                          colorFilter:
+                              ColorFilter.mode(c.ink, BlendMode.srcIn),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
 
-          // ── Continue Reading ─────────────────────────────────────────────
-          if (lastRead != null) ...[
+          // ── Continue Reading carousel ────────────────────────────────────
+          if (recentlyRead.isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'CONTINUE READING',
-                    style: TextStyle(
-                      fontSize: 10,
-                      height: 1,
-                      letterSpacing: 10 * 0.08,
-                      color: c.slate,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _ContinueReadingCard(
-                    entry: lastRead!,
-                    onRead: () =>
-                        onReadTap(lastRead!.mangaId, lastRead!.chapterId),
-                    c: c,
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              child: Text(
+                'CONTINUE READING',
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1,
+                  letterSpacing: 10 * 0.08,
+                  color: c.slate,
+                ),
               ),
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 116,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                itemCount: recentlyRead.length,
+                itemBuilder: (context, i) {
+                  final entry = recentlyRead[i];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                        right: i < recentlyRead.length - 1 ? 12 : 0),
+                    child: SizedBox(
+                      width: recentlyRead.length == 1
+                          ? MediaQuery.of(context).size.width - 40
+                          : MediaQuery.of(context).size.width * 0.82,
+                      child: _ContinueReadingCard(
+                        entry: entry,
+                        onRead: () => onReadTap(entry.mangaId, entry.chapterId),
+                        c: c,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
 
           // ── All section header ───────────────────────────────────────────
@@ -248,7 +372,9 @@ class _FilledState extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'ALL · ${mangas.length}',
+                  searching && mangas.length < totalCount
+                      ? '${mangas.length} of $totalCount'
+                      : 'ALL · $totalCount',
                   style: TextStyle(
                     fontSize: 10,
                     height: 1,
@@ -278,7 +404,7 @@ class _FilledState extends StatelessWidget {
               builder: (context, constraints) {
                 const crossAxisCount = 2;
                 const crossAxisSpacing = 12.0;
-                const belowCoverHeight = 33.0;
+                const belowCoverHeight = 42.0;
                 final cellWidth =
                     (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
                     crossAxisCount;
@@ -297,7 +423,11 @@ class _FilledState extends StatelessWidget {
                   itemCount: mangas.length,
                   itemBuilder: (context, i) => GestureDetector(
                     onTap: () => onMangaTap(mangas[i].id),
-                    child: _MangaCard(manga: mangas[i], c: c),
+                    child: _MangaCard(
+                      manga: mangas[i],
+                      progress: progress[mangas[i].id],
+                      c: c,
+                    ),
                   ),
                 );
               },
@@ -434,14 +564,21 @@ class _ContinueReadingCard extends StatelessWidget {
 // ── Grid card ─────────────────────────────────────────────────────────────────
 
 class _MangaCard extends StatelessWidget {
-  const _MangaCard({required this.manga, required this.c});
+  const _MangaCard({
+    required this.manga,
+    required this.c,
+    this.progress,
+  });
 
   final Manga manga;
   final SheepColors c;
+  final MangaProgressEntry? progress;
 
   @override
   Widget build(BuildContext context) {
     final sourceName = sourceById(manga.sourceId)?.name ?? manga.sourceId;
+    final hasProgress =
+        progress != null && progress!.totalCount > 0 && progress!.readCount > 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -469,9 +606,23 @@ class _MangaCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
+        if (hasProgress) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(1),
+            child: LinearProgressIndicator(
+              value: progress!.ratio,
+              backgroundColor: c.wool,
+              valueColor: AlwaysStoppedAnimation<Color>(c.ink),
+              minHeight: 2,
+            ),
+          ),
+          const SizedBox(height: 3),
+        ],
         Text(
-          sourceName,
+          hasProgress
+              ? '${progress!.readCount}/${progress!.totalCount} ch · $sourceName'
+              : sourceName,
           style: TextStyle(
             fontSize: 10,
             height: 1,

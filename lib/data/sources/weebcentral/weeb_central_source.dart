@@ -7,6 +7,13 @@ import '../http_manga_source.dart';
 
 // HTML scraper for https://weebcentral.com
 // Ported from keiyoushi/extensions-source src/en/weebcentral
+//
+// ID format: the series ULID only (e.g. "01J2GKJH7K6VK3EF2M8E3BYSAH").
+//   getDetails / getChapters prepend /series/ internally.
+//   WeebCentral redirects /series/{id} → /series/{id}/{slug} automatically.
+//
+// Chapter ID: the chapter ULID (e.g. "01J2..."), extracted from /chapters/{id}/read.
+//   Chapter.url stores the full path for getPages().
 class WeebCentralSource extends HttpMangaSource {
   @override
   String get id => 'weebcentral';
@@ -21,8 +28,8 @@ class WeebCentralSource extends HttpMangaSource {
   String get iconAsset => 'assets/svg/sources/weebcentral.svg';
 
   @override
-  Map<String, String> get defaultHeaders => const {
-    'User-Agent': 'SheepReader/1.0 (Android)',
+  Map<String, String> get defaultHeaders => {
+    ...super.defaultHeaders,
     'Referer': 'https://weebcentral.com/',
   };
 
@@ -47,6 +54,15 @@ class WeebCentralSource extends HttpMangaSource {
     _ => MangaStatus.unknown,
   };
 
+  // Extract series ULID from /series/{id}/{slug} paths.
+  // Prevents double-prefix when router builds /manga/{mangaId}.
+  String _seriesIdFromPath(String path) {
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    // segments: ["series", "{id}", "{slug}"] — return the ULID
+    if (segments.length >= 2 && segments[0] == 'series') return segments[1];
+    return segments.isNotEmpty ? segments.last : path;
+  }
+
   List<MangaSummary> _parseSearchPage(String html) {
     final doc = html_parser.parse(html);
     final results = <MangaSummary>[];
@@ -54,9 +70,16 @@ class WeebCentralSource extends HttpMangaSource {
       final href = el.attributes['href'] ?? '';
       if (href.isEmpty) continue;
       final path = Uri.tryParse(href)?.path ?? href;
-      final titleEl = el.querySelector('div:last-child');
+      final seriesId = _seriesIdFromPath(path);
+      // <a> children: <picture> (first-child) then <div>Title</div> (first div)
+      // then <div>Official</div> (last div). Use div:first-of-type to skip
+      // the picture and land on the title div, NOT div:first-child which fails
+      // because no div is the first child.
+      final titleEl = el.querySelector('div:first-of-type span') ??
+          el.querySelector('div:first-of-type') ??
+          el.querySelector('span');
       results.add(MangaSummary(
-        id: path,
+        id: seriesId,
         sourceId: id,
         title: titleEl?.text.trim() ?? '',
         coverUrl: _thumbnailUrl(el) ?? '',
@@ -115,7 +138,8 @@ class WeebCentralSource extends HttpMangaSource {
 
   @override
   Future<MangaDetails> getDetails(String mangaUrl) async {
-    final html = await fetchHtml('$baseUrl$mangaUrl');
+    // mangaUrl = series ULID — WeebCentral redirects /series/{id} → full slug URL
+    final html = await fetchHtml('$baseUrl/series/$mangaUrl');
     final doc = html_parser.parse(html);
 
     final sections = doc.querySelectorAll('section[x-data] > section');
@@ -125,20 +149,13 @@ class WeebCentralSource extends HttpMangaSource {
     final title = titleSection?.querySelector('h1')?.text.trim() ?? '';
     final coverUrl = infoSection != null ? _thumbnailUrl(infoSection) ?? '' : '';
 
-    final authorEls = infoSection?.querySelectorAll(
-          'ul > li a',
-        ) ??
-        [];
+    final authorEls = infoSection?.querySelectorAll('ul > li a') ?? [];
     final authors = authorEls.map((e) => e.text.trim()).toList();
 
-    final statusText = infoSection
-        ?.querySelector('ul > li > a')
-        ?.text
-        .trim();
+    final statusText = infoSection?.querySelector('ul > li > a')?.text.trim();
     final status = _toStatus(statusText);
 
-    final synopsis =
-        titleSection?.querySelector('li p')?.text.trim() ?? '';
+    final synopsis = titleSection?.querySelector('li p')?.text.trim() ?? '';
 
     return MangaDetails(
       id: mangaUrl,
@@ -152,11 +169,9 @@ class WeebCentralSource extends HttpMangaSource {
 
   @override
   Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
-    // mangaUrl = /series/{id}/{slug}
-    // chapter list = /series/{id}/full-chapter-list
-    final parts = mangaUrl.split('/');
-    final seriesId = parts.length > 2 ? parts[2] : '';
-    final html = await fetchHtml('$baseUrl/series/$seriesId/full-chapter-list');
+    // mangaUrl = series ULID — chapter list is at /series/{id}/full-chapter-list
+    final html =
+        await fetchHtml('$baseUrl/series/$mangaUrl/full-chapter-list');
     final doc = html_parser.parse(html);
 
     final items = doc.querySelectorAll('div[x-data] > a');
@@ -166,12 +181,19 @@ class WeebCentralSource extends HttpMangaSource {
       final href = el.attributes['href'] ?? '';
       if (href.isEmpty) continue;
       final path = Uri.tryParse(href)?.path ?? href;
+      // path = /chapters/{chapterId}/read
+      // Chapter ID = the ULID segment (URL-safe). URL = full path for getPages.
+      final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+      // ["chapters", "{id}", "read"] → id = segments[1]
+      final chapterId = (segments.length >= 2 && segments[0] == 'chapters')
+          ? segments[1]
+          : path;
       final nameEl = el.querySelector('span.flex > span');
       final rawTitle = nameEl?.text.trim() ?? '';
       final numMatch = RegExp(r'[\d]+\.?\d*').firstMatch(rawTitle);
       final number = double.tryParse(numMatch?.group(0) ?? '') ?? 0.0;
       chapters.add(ChapterSummary(
-        id: path,
+        id: chapterId,
         title: rawTitle.isNotEmpty ? rawTitle : path,
         number: number,
         url: path,
@@ -184,8 +206,8 @@ class WeebCentralSource extends HttpMangaSource {
   @override
   Future<List<String>> getPages(String chapterUrl,
       {bool dataSaver = false}) async {
-    // chapterUrl = /chapters/{id}
-    // images endpoint = /chapters/{id}/images?is_prev=False&reading_style=long_strip
+    // chapterUrl = full path like /chapters/{id}/read (stored in Chapter.url)
+    // images endpoint = /chapters/{id}/read/images?is_prev=False&...
     final html = await fetchHtml(
       '$baseUrl$chapterUrl/images',
       params: <String, dynamic>{
@@ -196,7 +218,8 @@ class WeebCentralSource extends HttpMangaSource {
     final doc = html_parser.parse(html);
     return doc
         .querySelectorAll('section img')
-        .map((img) => img.attributes['src'] ?? img.attributes['data-src'] ?? '')
+        .map((img) =>
+            img.attributes['src'] ?? img.attributes['data-src'] ?? '')
         .where((src) => src.isNotEmpty)
         .toList();
   }

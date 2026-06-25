@@ -9,12 +9,10 @@ import '../../data/sources/source_registry.dart';
 import '../../domain/models/page_image.dart';
 import '../../domain/page_source.dart';
 
-// Watches the chapter row from Drift by ID.
 final readerChapterProvider =
     StreamProvider.autoDispose.family<Chapter?, String>((ref, chapterId) =>
         ref.watch(databaseProvider).watchChapterById(chapterId));
 
-// Loads pages for a chapter — resolves local vs. remote automatically.
 final readerPagesProvider =
     FutureProvider.autoDispose.family<List<PageImage>, String>(
         (ref, chapterId) async {
@@ -30,6 +28,45 @@ final readerPagesProvider =
   final pageSource = _resolvePageSource(chapter, manga.sourceId, dataSaver);
   return pageSource.getPages();
 });
+
+// Returns the 0-based page index to resume from (0 = start from beginning).
+final readerInitialPageProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, chapterId) async {
+  final db = ref.read(databaseProvider);
+  final progress = await db.getReadingProgress(chapterId);
+  if (progress == null) return 0;
+  return (progress.lastPage - 1).clamp(0, 9999);
+});
+
+// Watches all chapters for a manga (used to find next chapter).
+final _readerMangaChaptersProvider =
+    StreamProvider.autoDispose.family<List<Chapter>, String>(
+  (ref, mangaId) => ref.watch(databaseProvider).watchChapters(mangaId),
+);
+
+// Returns the next chapter's ID (the chapter with the lowest number greater
+// than the current chapter), or null if this is the last chapter.
+final nextChapterIdProvider =
+    Provider.autoDispose.family<String?, (String, String)>(
+  (ref, args) {
+    final (mangaId, currentChapterId) = args;
+    final chapters =
+        ref.watch(_readerMangaChaptersProvider(mangaId)).valueOrNull;
+    if (chapters == null || chapters.isEmpty) return null;
+    final current = chapters.cast<Chapter?>().firstWhere(
+          (ch) => ch?.id == currentChapterId,
+          orElse: () => null,
+        );
+    if (current == null) return null;
+    Chapter? next;
+    for (final ch in chapters) {
+      if (ch.number > current.number) {
+        if (next == null || ch.number < next.number) next = ch;
+      }
+    }
+    return next?.id;
+  },
+);
 
 PageSource _resolvePageSource(
     Chapter chapter, String sourceId, bool dataSaver) {

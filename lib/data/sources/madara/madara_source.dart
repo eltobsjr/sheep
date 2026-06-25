@@ -11,6 +11,14 @@ import '../http_manga_source.dart';
 //
 // Concrete subclasses only need to override id, name, baseUrl, iconAsset.
 // Sites that use non-standard selectors can also override the selector getters.
+//
+// ID format: manga slug WITHOUT /manga/ prefix and without trailing slash.
+//   e.g. "nano-machine-manhwa"  (not "/manga/nano-machine-manhwa/")
+//   getDetails / getChapters prepend /manga/ internally.
+//
+// Chapter ID: last path segment of the chapter URL.
+//   e.g. "chapter-1"  (not "/manga/nano-machine-manhwa/chapter-1/")
+//   Chapter.url stores the full path for getPages().
 abstract class MadaraSource extends HttpMangaSource {
   // Override in subclasses if the site uses different selectors.
   String get popularSelector => 'div.page-item-detail';
@@ -22,10 +30,9 @@ abstract class MadaraSource extends HttpMangaSource {
   bool get useNewChapterEndpoint => true;
 
   @override
-  Map<String, String> get defaultHeaders => const {
-    'User-Agent': 'SheepReader/1.0 (Android)',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'pt-BR,en-US;q=0.9,en;q=0.8',
+  Map<String, String> get defaultHeaders => {
+    ...super.defaultHeaders,
+    'Referer': '$baseUrl/',
   };
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -49,13 +56,22 @@ abstract class MadaraSource extends HttpMangaSource {
     _ => MangaStatus.unknown,
   };
 
+  // Extract slug from /manga/{slug}/ URLs.
+  // Prevents the double-prefix bug: router already adds /manga/ when navigating.
+  String _pathToSlug(String path) {
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segments.length >= 2 && segments[0] == 'manga') return segments[1];
+    if (segments.isNotEmpty) return segments.last;
+    return path;
+  }
+
   MangaSummary _parseCard(html_dom.Element el) {
     final anchor = el.querySelector('.post-title a') ?? el.querySelector('a');
     final img = el.querySelector('img');
     final href = anchor?.attributes['href'] ?? '';
-    final mangaPath = Uri.tryParse(href)?.path ?? href;
+    final slug = _pathToSlug(Uri.tryParse(href)?.path ?? href);
     return MangaSummary(
-      id: mangaPath,
+      id: slug,
       sourceId: id,
       title: anchor?.text.trim() ?? '',
       coverUrl: img != null ? _imgSrc(img) : '',
@@ -66,12 +82,10 @@ abstract class MadaraSource extends HttpMangaSource {
 
   @override
   Future<List<MangaSummary>> getPopular(int page) async {
-    final html = await fetchHtml(
-      '$baseUrl/manga/',
-      params: <String, dynamic>{'m_orderby': 'views', 'page': page},
-    );
-    final doc = html_parser.parse(html);
-    return doc
+    final html = await _mangaListHtml(
+        {'m_orderby': 'views', 'page': page});
+    return html_parser
+        .parse(html)
         .querySelectorAll(popularSelector)
         .map(_parseCard)
         .where((m) => m.title.isNotEmpty)
@@ -80,16 +94,27 @@ abstract class MadaraSource extends HttpMangaSource {
 
   @override
   Future<List<MangaSummary>> getLatest(int page) async {
-    final html = await fetchHtml(
-      '$baseUrl/manga/',
-      params: <String, dynamic>{'m_orderby': 'latest', 'page': page},
-    );
-    final doc = html_parser.parse(html);
-    return doc
+    final html = await _mangaListHtml(
+        {'m_orderby': 'latest', 'page': page});
+    return html_parser
+        .parse(html)
         .querySelectorAll(popularSelector)
         .map(_parseCard)
         .where((m) => m.title.isNotEmpty)
         .toList();
+  }
+
+  // Try /manga/ first; some sites only have the root URL with post_type filter.
+  Future<String> _mangaListHtml(Map<String, dynamic> params) async {
+    try {
+      return await fetchHtml('$baseUrl/manga/', params: params);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404 || e.response?.statusCode == 403) {
+        return fetchHtml('$baseUrl/',
+            params: {...params, 'post_type': 'wp-manga'});
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -110,14 +135,15 @@ abstract class MadaraSource extends HttpMangaSource {
 
     final results = <MangaSummary>[];
     for (final el in elements) {
-      final href = el.attributes['href'] ?? el.querySelector('a')?.attributes['href'] ?? '';
+      final href = el.attributes['href'] ??
+          el.querySelector('a')?.attributes['href'] ?? '';
       if (href.isEmpty) continue;
       final img = el.querySelector('img');
       final titleEl = el.querySelector('.post-title') ??
           el.querySelector('h3') ??
           el.querySelector('h4');
       results.add(MangaSummary(
-        id: Uri.tryParse(href)?.path ?? href,
+        id: _pathToSlug(Uri.tryParse(href)?.path ?? href),
         sourceId: id,
         title: titleEl?.text.trim() ?? el.text.trim(),
         coverUrl: img != null ? _imgSrc(img) : '',
@@ -128,7 +154,8 @@ abstract class MadaraSource extends HttpMangaSource {
 
   @override
   Future<MangaDetails> getDetails(String mangaUrl) async {
-    final html = await fetchHtml('$baseUrl$mangaUrl');
+    // mangaUrl = slug (e.g. "nano-machine-manhwa") — prepend /manga/
+    final html = await fetchHtml('$baseUrl/manga/$mangaUrl');
     final doc = html_parser.parse(html);
 
     final title = doc.querySelector('.post-title h1')?.text.trim() ??
@@ -158,8 +185,10 @@ abstract class MadaraSource extends HttpMangaSource {
 
   @override
   Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
+    // mangaUrl = slug — build full manga URL with /manga/ prefix
+    final mangaPath = '/manga/$mangaUrl/';
     final chapterListUrl = useNewChapterEndpoint
-        ? '$baseUrl$mangaUrl${mangaUrl.endsWith('/') ? '' : '/'}ajax/chapters/'
+        ? '$baseUrl${mangaPath}ajax/chapters/'
         : '$baseUrl/wp-admin/admin-ajax.php';
 
     final html = useNewChapterEndpoint
@@ -175,13 +204,19 @@ abstract class MadaraSource extends HttpMangaSource {
       final href = anchor?.attributes['href'] ?? '';
       if (href.isEmpty) continue;
       final chPath = Uri.tryParse(href)?.path ?? href;
+      // Chapter ID = last path segment (URL-safe, used as route param).
+      // Chapter URL = full path (used by getPages to fetch the page).
+      final chSlug = chPath
+          .split('/')
+          .where((s) => s.isNotEmpty)
+          .lastOrNull ?? chPath;
       final rawTitle = anchor?.text.trim() ?? '';
       // Extract chapter number from title like "Capítulo 1.5" or "Chapter 10"
       final numMatch = RegExp(r'[\d]+\.?\d*').firstMatch(rawTitle);
       final number = double.tryParse(numMatch?.group(0) ?? '') ?? 0.0;
 
       chapters.add(ChapterSummary(
-        id: chPath,
+        id: chSlug,
         title: rawTitle.isNotEmpty ? rawTitle : 'Cap. ${numMatch?.group(0) ?? '?'}',
         number: number,
         url: chPath,
@@ -194,8 +229,7 @@ abstract class MadaraSource extends HttpMangaSource {
 
   Future<String> _postChapterList(String mangaUrl) async {
     // Fallback: POST to admin-ajax.php — needs manga post ID from page.
-    // For simplicity, fetch the manga page and extract the ID.
-    final html = await fetchHtml('$baseUrl$mangaUrl');
+    final html = await fetchHtml('$baseUrl/manga/$mangaUrl');
     final doc = html_parser.parse(html);
     final idEl = doc.querySelector('[data-id]');
     final postId = idEl?.attributes['data-id'] ?? '';
@@ -214,6 +248,7 @@ abstract class MadaraSource extends HttpMangaSource {
   @override
   Future<List<String>> getPages(String chapterUrl,
       {bool dataSaver = false}) async {
+    // chapterUrl = full path like /manga/slug/chapter-1/ (stored in Chapter.url)
     final html = await fetchHtml('$baseUrl$chapterUrl');
     final doc = html_parser.parse(html);
     final images = doc.querySelectorAll(pageSelector);
@@ -239,46 +274,3 @@ class MangaOnlineSource extends MadaraSource {
   String get searchSelector => '#loop-content .page-listing-item';
 }
 
-class LeitorDeMangasSource extends MadaraSource {
-  @override
-  String get id => 'leitordemangas';
-  @override
-  String get name => 'Leitor de Mangás';
-  @override
-  String get baseUrl => 'https://leitordemangas.com';
-  @override
-  String get iconAsset => 'assets/svg/sources/leitordemangas.svg';
-}
-
-class MangasBrasukaSource extends MadaraSource {
-  @override
-  String get id => 'mangasbrasuka';
-  @override
-  String get name => 'Mangás Brasuka';
-  @override
-  String get baseUrl => 'https://mangasbrasuka.com';
-  @override
-  String get iconAsset => 'assets/svg/sources/mangasbrasuka.svg';
-}
-
-class NinjaScanSource extends MadaraSource {
-  @override
-  String get id => 'ninjascan';
-  @override
-  String get name => 'Ninja Scan';
-  @override
-  String get baseUrl => 'https://ninjascan.com.br';
-  @override
-  String get iconAsset => 'assets/svg/sources/ninjascan.svg';
-}
-
-class MangaDashSource extends MadaraSource {
-  @override
-  String get id => 'mangadash';
-  @override
-  String get name => 'MangaDash';
-  @override
-  String get baseUrl => 'https://mangadash.com.br';
-  @override
-  String get iconAsset => 'assets/svg/sources/mangadash.svg';
-}

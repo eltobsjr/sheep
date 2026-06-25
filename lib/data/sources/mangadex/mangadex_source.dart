@@ -93,16 +93,13 @@ class MangaDexSource extends HttpMangaSource {
 
   @override
   Future<List<MangaSummary>> getPopular(int page) async {
-    final response = await client.get<dynamic>(
-      '/manga',
-      queryParameters: <String, dynamic>{
-        'order[followedCount]': 'desc',
-        'availableTranslatedLanguage[]': lang,
-        'limit': _pageLimit,
-        'offset': (page - 1) * _pageLimit,
-        'includes[]': ['cover_art', 'author', 'artist'],
-      },
-    );
+    final popularQuery =
+        'order[followedCount]=desc'
+        '&availableTranslatedLanguage[]=${Uri.encodeQueryComponent(lang)}'
+        '&includes[]=cover_art&includes[]=author&includes[]=artist'
+        '&limit=$_pageLimit'
+        '&offset=${(page - 1) * _pageLimit}';
+    final response = await client.get<dynamic>('/manga?$popularQuery');
     final body = response.data as Map<String, dynamic>;
     final data = body['data'] as List<dynamic>;
     return data.map((d) => _toSummary(d as Map<String, dynamic>)).toList();
@@ -110,17 +107,11 @@ class MangaDexSource extends HttpMangaSource {
 
   @override
   Future<List<MangaSummary>> getLatest(int page) async {
-    final chapRes = await client.get<dynamic>(
-      '/chapter',
-      queryParameters: <String, dynamic>{
-        'translatedLanguage[]': lang,
-        'order[publishAt]': 'desc',
-        'limit': _pageLimit,
-        'offset': (page - 1) * _pageLimit,
-        'includeFuturePublishAt': '0',
-        'includeEmptyPages': '0',
-      },
-    );
+    final latestQuery = 'translatedLanguage[]=${Uri.encodeQueryComponent(lang)}'
+        '&order[publishAt]=desc'
+        '&limit=$_pageLimit'
+        '&offset=${(page - 1) * _pageLimit}';
+    final chapRes = await client.get<dynamic>('/chapter?$latestQuery');
     final chapBody = chapRes.data as Map<String, dynamic>;
     final chapData = chapBody['data'] as List<dynamic>;
 
@@ -135,13 +126,9 @@ class MangaDexSource extends HttpMangaSource {
     }
     if (ids.isEmpty) return [];
 
+    final idsQuery = ids.map((id) => 'ids[]=${Uri.encodeQueryComponent(id)}').join('&');
     final mangaRes = await client.get<dynamic>(
-      '/manga',
-      queryParameters: <String, dynamic>{
-        'ids[]': ids.toList(),
-        'limit': ids.length,
-        'includes[]': ['cover_art', 'author', 'artist'],
-      },
+      '/manga?$idsQuery&includes[]=cover_art&includes[]=author&includes[]=artist&limit=${ids.length}',
     );
     final mangaBody = mangaRes.data as Map<String, dynamic>;
     final mangaData = mangaBody['data'] as List<dynamic>;
@@ -150,16 +137,13 @@ class MangaDexSource extends HttpMangaSource {
 
   @override
   Future<List<MangaSummary>> search(String query, int page) async {
-    final response = await client.get<dynamic>(
-      '/manga',
-      queryParameters: <String, dynamic>{
-        'title': query,
-        'limit': _pageLimit,
-        'offset': (page - 1) * _pageLimit,
-        'includes[]': ['cover_art', 'author', 'artist'],
-        'availableTranslatedLanguage[]': lang,
-      },
-    );
+    final searchQuery =
+        'title=${Uri.encodeQueryComponent(query)}'
+        '&availableTranslatedLanguage[]=${Uri.encodeQueryComponent(lang)}'
+        '&includes[]=cover_art&includes[]=author&includes[]=artist'
+        '&limit=$_pageLimit'
+        '&offset=${(page - 1) * _pageLimit}';
+    final response = await client.get<dynamic>('/manga?$searchQuery');
     final body = response.data as Map<String, dynamic>;
     final data = body['data'] as List<dynamic>;
     return data.map((d) => _toSummary(d as Map<String, dynamic>)).toList();
@@ -168,13 +152,14 @@ class MangaDexSource extends HttpMangaSource {
   @override
   Future<MangaDetails> getDetails(String mangaUrl) async {
     final response = await client.get<dynamic>(
-      '/manga/$mangaUrl',
-      queryParameters: <String, dynamic>{
-        'includes[]': ['cover_art', 'author', 'artist'],
-      },
+      '/manga/$mangaUrl?includes[]=cover_art&includes[]=author&includes[]=artist',
     );
     final body = response.data as Map<String, dynamic>;
-    final data = body['data'] as Map<String, dynamic>;
+    final rawData = body['data'];
+    if (rawData == null) {
+      throw Exception('MangaDex: no data for $mangaUrl (result=${body['result']})');
+    }
+    final data = rawData as Map<String, dynamic>;
     final mangaId = data['id'] as String;
     final attrs = data['attributes'] as Map<String, dynamic>;
     final rels = data['relationships'] as List<dynamic>;
@@ -211,20 +196,21 @@ class MangaDexSource extends HttpMangaSource {
     var offset = 0;
 
     while (true) {
-      final response = await client.get<dynamic>(
-        '/chapter',
-        queryParameters: <String, dynamic>{
-          'manga': mangaUrl,
-          'translatedLanguage[]': lang,
-          'order[chapter]': 'asc',
-          'limit': _chapterBatch,
-          'offset': offset,
-          'includeFuturePublishAt': '0',
-        },
-      );
+      // Use raw query string for bracket params — Dio would percent-encode
+      // `order[chapter]` → `order%5Bchapter%5D` which some API versions reject.
+      final query = 'manga=${Uri.encodeQueryComponent(mangaUrl)}'
+          '&translatedLanguage[]=${Uri.encodeQueryComponent(lang)}'
+          '&order[chapter]=asc'
+          '&limit=$_chapterBatch'
+          '&offset=$offset';
+      final response = await client.get<dynamic>('/chapter?$query');
       final body = response.data as Map<String, dynamic>;
-      final data = body['data'] as List<dynamic>;
-      final total = body['total'] as int;
+      final rawList = body['data'];
+      if (rawList == null) {
+        throw Exception('MangaDex chapters: no data for $mangaUrl (result=${body['result']})');
+      }
+      final data = rawList as List<dynamic>;
+      final total = (body['total'] as num?)?.toInt() ?? 0;
 
       for (final raw in data) {
         final ch = raw as Map<String, dynamic>;
