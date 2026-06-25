@@ -9,6 +9,38 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
+// Joined result for active download items.
+class ActiveDownloadEntry {
+  const ActiveDownloadEntry({
+    required this.chapterId,
+    required this.mangaId,
+    required this.mangaTitle,
+    required this.chapterTitle,
+    required this.progress,
+    required this.status,
+  });
+
+  final String chapterId;
+  final String mangaId;
+  final String mangaTitle;
+  final String chapterTitle;
+  final int progress; // 0–100
+  final String status;
+}
+
+// Joined result for completed downloads (grouped by manga).
+class CompletedDownloadEntry {
+  const CompletedDownloadEntry({
+    required this.mangaId,
+    required this.mangaTitle,
+    required this.chapterCount,
+  });
+
+  final String mangaId;
+  final String mangaTitle;
+  final int chapterCount;
+}
+
 // Joined result for the "Continue Reading" card.
 class LastReadEntry {
   const LastReadEntry({
@@ -109,6 +141,49 @@ class AppDatabase extends _$AppDatabase {
         updatedAt: Value(DateTime.now()),
       ),
     );
+  }
+
+  // Watches active/queued downloads, joined with chapter and manga info.
+  Stream<List<ActiveDownloadEntry>> watchActiveDownloads() {
+    final q = select(downloadQueue).join([
+      innerJoin(chapters, chapters.id.equalsExp(downloadQueue.chapterId)),
+      innerJoin(mangas, mangas.id.equalsExp(chapters.mangaId)),
+    ])..where(downloadQueue.status.isIn(['queued', 'downloading']));
+
+    return q.watch().map((rows) => rows.map((row) {
+          final dq = row.readTable(downloadQueue);
+          final ch = row.readTable(chapters);
+          final m = row.readTable(mangas);
+          return ActiveDownloadEntry(
+            chapterId: dq.chapterId,
+            mangaId: m.id,
+            mangaTitle: m.title,
+            chapterTitle: ch.title,
+            progress: dq.progress,
+            status: dq.status,
+          );
+        }).toList());
+  }
+
+  // Watches completed downloads (chapters with isDownloaded=true), grouped by manga.
+  Stream<List<CompletedDownloadEntry>> watchCompletedDownloads() {
+    final q = select(chapters).join([
+      innerJoin(mangas, mangas.id.equalsExp(chapters.mangaId)),
+    ])..where(chapters.isDownloaded.equals(true));
+
+    return q.watch().map((rows) {
+      final grouped = <String, CompletedDownloadEntry>{};
+      for (final row in rows) {
+        final m = row.readTable(mangas);
+        final existing = grouped[m.id];
+        grouped[m.id] = CompletedDownloadEntry(
+          mangaId: m.id,
+          mangaTitle: m.title,
+          chapterCount: (existing?.chapterCount ?? 0) + 1,
+        );
+      }
+      return grouped.values.toList();
+    });
   }
 
   // Saves a manga summary to DB (does NOT overwrite inLibrary or detailed fields).
