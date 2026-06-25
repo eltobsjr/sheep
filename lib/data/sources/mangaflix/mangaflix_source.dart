@@ -17,6 +17,9 @@ class MangaFlixSource extends HttpMangaSource {
   @override
   String get iconAsset => 'assets/svg/sources/mangaflix.svg';
 
+  @override
+  String get language => 'pt-br';
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   MangaSummary _toSummary(Map<String, dynamic> d) => MangaSummary(

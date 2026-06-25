@@ -287,6 +287,10 @@ class AppDatabase extends _$AppDatabase {
             ..limit(1))
           .getSingleOrNull();
 
+  Stream<DownloadQueueData?> watchDownloadEntry(String chapterId) =>
+      (select(downloadQueue)..where((d) => d.chapterId.equals(chapterId)))
+          .watchSingleOrNull();
+
   Future<void> updateDownloadProgress(String chapterId, int progress) =>
       (update(downloadQueue)..where((d) => d.chapterId.equals(chapterId)))
           .write(DownloadQueueCompanion(progress: Value(progress)));

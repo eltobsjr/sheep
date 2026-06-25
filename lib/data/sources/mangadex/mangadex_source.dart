@@ -19,6 +19,9 @@ class MangaDexSource extends HttpMangaSource {
   @override
   String get iconAsset => 'assets/svg/sources/mangadex.svg';
 
+  @override
+  String get language => lang;
+
   static const _coversBase = 'https://uploads.mangadex.org/covers';
   static const _pageLimit = 20;
   static const _chapterBatch = 500;

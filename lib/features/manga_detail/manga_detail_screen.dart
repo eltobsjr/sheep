@@ -28,6 +28,7 @@ class MangaDetailScreen extends ConsumerStatefulWidget {
 
 class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
   bool _synopsisExpanded = false;
+  bool _offlineOnly = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,8 +49,11 @@ class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
           chaptersAsync: chaptersAsync,
           fetchAsync: fetchAsync,
           synopsisExpanded: _synopsisExpanded,
+          offlineOnly: _offlineOnly,
           onToggleSynopsis: () =>
               setState(() => _synopsisExpanded = !_synopsisExpanded),
+          onToggleOfflineOnly: () =>
+              setState(() => _offlineOnly = !_offlineOnly),
         ),
       ),
     );
@@ -65,7 +69,9 @@ class _DetailBody extends ConsumerWidget {
     required this.chaptersAsync,
     required this.fetchAsync,
     required this.synopsisExpanded,
+    required this.offlineOnly,
     required this.onToggleSynopsis,
+    required this.onToggleOfflineOnly,
   });
 
   final String mangaId;
@@ -73,7 +79,9 @@ class _DetailBody extends ConsumerWidget {
   final AsyncValue<List<Chapter>> chaptersAsync;
   final AsyncValue<void> fetchAsync;
   final bool synopsisExpanded;
+  final bool offlineOnly;
   final VoidCallback onToggleSynopsis;
+  final VoidCallback onToggleOfflineOnly;
 
   static const _placeholderColors = [
     Color(0xFF1A1A2E),
@@ -112,15 +120,18 @@ class _DetailBody extends ConsumerWidget {
     final coverPath = manga?.coverPath ?? '';
     final chapterSort = ref.watch(settingsProvider).chapterSort;
 
-    final chapters = chaptersAsync.valueOrNull ?? const [];
+    final allChapters = chaptersAsync.valueOrNull ?? const [];
+    final chapters = offlineOnly
+        ? allChapters.where((ch) => ch.isDownloaded).toList()
+        : allChapters;
     // Always sort ascending by number to find first/continue chapter correctly.
-    final sortedAsc = [...chapters]..sort((a, b) => a.number.compareTo(b.number));
+    final sortedAsc = [...allChapters]..sort((a, b) => a.number.compareTo(b.number));
     final firstChapter = sortedAsc.isNotEmpty ? sortedAsc.first : null;
 
     // Determine the chapter to start/continue reading.
     final readMap =
         ref.watch(chapterReadMapProvider(mangaId)).valueOrNull ?? const {};
-    final lastReadNum = chapters.fold<double>(
+    final lastReadNum = allChapters.fold<double>(
       -1,
       (mx, ch) => (readMap[ch.id] == true && ch.number > mx) ? ch.number : mx,
     );
@@ -133,8 +144,8 @@ class _DetailBody extends ConsumerWidget {
         : firstChapter;
 
     final topPad = MediaQuery.of(context).padding.top;
-    final isLoading = fetchAsync.isLoading && chapters.isEmpty;
-    final hasError = fetchAsync.hasError && chapters.isEmpty;
+    final isLoading = fetchAsync.isLoading && allChapters.isEmpty;
+    final hasError = fetchAsync.hasError && allChapters.isEmpty;
 
     return Column(
       children: [
@@ -425,9 +436,11 @@ class _DetailBody extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        chapters.isEmpty
+                        allChapters.isEmpty
                             ? 'CHAPTERS'
-                            : 'CHAPTERS · ${chapters.length}',
+                            : offlineOnly
+                                ? 'OFFLINE · ${chapters.length}'
+                                : 'CHAPTERS · ${allChapters.length}',
                         style: TextStyle(
                           fontSize: 10,
                           height: 1,
@@ -435,42 +448,80 @@ class _DetailBody extends ConsumerWidget {
                           color: c.slate,
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          final n = ref.read(settingsProvider.notifier);
-                          n.setChapterSort(
-                              chapterSort == 'desc' ? 'asc' : 'desc');
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
-                          child: Row(
-                            children: [
-                              Text(
-                                chapterSort == 'asc'
-                                    ? 'Oldest first'
-                                    : 'Latest first',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1,
-                                  color: c.slate,
-                                ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Offline filter toggle
+                          GestureDetector(
+                            onTap: onToggleOfflineOnly,
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SvgPicture.string(
+                                    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
+                                    ' stroke="${offlineOnly ? "#0A0A0A" : "#6B6B6B"}" stroke-width="1.3" stroke-linecap="round"'
+                                    ' stroke-linejoin="round"><path d="M2 9.5l2-2m6-4l-1.5 1.5M4 5.5L6 3.5m0 0L8 5.5m-2-2V9"/></svg>',
+                                    width: 12,
+                                    height: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Offline',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      height: 1,
+                                      color: offlineOnly ? c.ink : c.slate,
+                                      fontWeight: offlineOnly
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 4),
-                              SvgPicture.string(
-                                chapterSort == 'asc'
-                                    ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
-                                        ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
-                                        '<path d="M4 7l2-2 2 2"/></svg>'
-                                    : '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
-                                        ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
-                                        '<path d="M4 5l2 2 2-2"/></svg>',
-                                width: 12,
-                                height: 12,
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          // Sort toggle
+                          GestureDetector(
+                            onTap: () {
+                              final n = ref.read(settingsProvider.notifier);
+                              n.setChapterSort(
+                                  chapterSort == 'desc' ? 'asc' : 'desc');
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    chapterSort == 'asc'
+                                        ? 'Oldest first'
+                                        : 'Latest first',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      height: 1,
+                                      color: c.slate,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  SvgPicture.string(
+                                    chapterSort == 'asc'
+                                        ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
+                                            ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
+                                            '<path d="M4 7l2-2 2 2"/></svg>'
+                                        : '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"'
+                                            ' stroke="#6B6B6B" stroke-width="1.3" stroke-linecap="round">'
+                                            '<path d="M4 5l2 2 2-2"/></svg>',
+                                    width: 12,
+                                    height: 12,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -522,12 +573,15 @@ class _DetailBody extends ConsumerWidget {
                             : () => ref
                                 .read(downloadServiceProvider)
                                 .queue(ch.id),
+                        onCancelDownload: () => ref
+                            .read(downloadServiceProvider)
+                            .cancel(ch.id),
                         onMarkRead: (isRead) => ref
                             .read(databaseProvider)
                             .markChapterRead(ch.id, isRead: isRead),
                         onMarkAllPreviousRead: () {
                           final db = ref.read(databaseProvider);
-                          for (final c in chapters) {
+                          for (final c in allChapters) {
                             if (c.number <= ch.number) {
                               db.markChapterRead(c.id, isRead: true);
                             }
@@ -627,6 +681,7 @@ class _ChapterRow extends StatelessWidget {
     required this.isRead,
     required this.onTap,
     this.onDownload,
+    this.onCancelDownload,
     this.onMarkRead,
     this.onMarkAllPreviousRead,
   });
@@ -635,6 +690,7 @@ class _ChapterRow extends StatelessWidget {
   final bool isRead;
   final VoidCallback onTap;
   final VoidCallback? onDownload;
+  final VoidCallback? onCancelDownload;
   final void Function(bool)? onMarkRead;
   final VoidCallback? onMarkAllPreviousRead;
 
@@ -786,14 +842,11 @@ class _ChapterRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Download / checkmark button — área de toque 44×44
-            GestureDetector(
-              onTap: onDownload,
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: _ChapterActionButton(chapter: chapter, c: c),
-              ),
+            // Download / progress / checkmark button — área de toque 44×44
+            _ChapterDownloadButton(
+              chapter: chapter,
+              onDownload: onDownload,
+              onCancel: onCancelDownload,
             ),
           ],
         ),
@@ -815,43 +868,92 @@ class _ChapterRow extends StatelessWidget {
   }
 }
 
-// ── Chapter action button ─────────────────────────────────────────────────────
+// ── Chapter download button ───────────────────────────────────────────────────
 
-class _ChapterActionButton extends StatelessWidget {
-  const _ChapterActionButton({required this.chapter, required this.c});
+class _ChapterDownloadButton extends ConsumerWidget {
+  const _ChapterDownloadButton({
+    required this.chapter,
+    this.onDownload,
+    this.onCancel,
+  });
 
   final Chapter chapter;
-  final SheepColors c;
+  final VoidCallback? onDownload;
+  final VoidCallback? onCancel;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        color: chapter.isDownloaded ? c.ink : c.wool,
-        borderRadius: BorderRadius.circular(7),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = SheepColors.of(context);
+    final entry =
+        ref.watch(chapterDownloadEntryProvider(chapter.id)).valueOrNull;
+
+    final isQueued = entry?.status == 'queued';
+    final isDownloading = entry?.status == 'downloading';
+    final inProgress = isQueued || isDownloading;
+    final progress = isDownloading ? (entry?.progress ?? 0) : 0;
+
+    return GestureDetector(
+      onTap: inProgress ? onCancel : onDownload,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: chapter.isDownloaded
+                ? c.ink
+                : inProgress
+                    ? c.wool
+                    : c.wool,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          alignment: Alignment.center,
+          child: chapter.isDownloaded
+              ? SvgPicture.string(
+                  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"'
+                  ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
+                  ' stroke-linejoin="round"><path d="M2.5 7l3 3 6-5"/></svg>',
+                  width: 14,
+                  height: 14,
+                )
+              : inProgress
+                  ? Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            value: isDownloading ? progress / 100 : null,
+                            strokeWidth: 2,
+                            color: c.slate,
+                          ),
+                        ),
+                        // Stop icon
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: c.slate,
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                        ),
+                      ],
+                    )
+                  : SvgPicture.string(
+                      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"'
+                      ' stroke="#6B6B6B" stroke-width="1.5" stroke-linecap="round"'
+                      ' stroke-linejoin="round">'
+                      '<line x1="7" y1="2" x2="7" y2="10"/>'
+                      '<polyline points="4,7 7,10 10,7"/>'
+                      '<line x1="2" y1="13" x2="12" y2="13"/>'
+                      '</svg>',
+                      width: 14,
+                      height: 14,
+                    ),
+        ),
       ),
-      alignment: Alignment.center,
-      child: chapter.isDownloaded
-          ? SvgPicture.string(
-              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"'
-              ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
-              ' stroke-linejoin="round"><path d="M2.5 7l3 3 6-5"/></svg>',
-              width: 14,
-              height: 14,
-            )
-          : SvgPicture.string(
-              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"'
-              ' stroke="#6B6B6B" stroke-width="1.5" stroke-linecap="round"'
-              ' stroke-linejoin="round">'
-              '<line x1="7" y1="2" x2="7" y2="10"/>'
-              '<polyline points="4,7 7,10 10,7"/>'
-              '<line x1="2" y1="13" x2="12" y2="13"/>'
-              '</svg>',
-              width: 14,
-              height: 14,
-            ),
     );
   }
 }

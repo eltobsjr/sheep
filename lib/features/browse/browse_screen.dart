@@ -24,8 +24,17 @@ class BrowseScreen extends ConsumerWidget {
     final c = SheepColors.of(context);
     final selectedId = ref.watch(selectedSourceIdProvider);
     final orderedIds = ref.watch(sourceOrderProvider);
+    final selectedLang = ref.watch(selectedLanguageProvider);
     final popularAsync = ref.watch(popularProvider);
     final latestAsync = ref.watch(latestProvider);
+
+    // Filter source IDs by selected language
+    final filteredIds = selectedLang == 'all'
+        ? orderedIds
+        : orderedIds.where((id) {
+            final source = sourceById(id);
+            return source?.language == selectedLang;
+          }).toList();
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -82,6 +91,68 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
+            // ── Language tabs ─────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                  children: [
+                    for (final (lang, label) in [
+                      ('all', 'All'),
+                      ('pt-br', 'PT-BR'),
+                      ('en', 'EN'),
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () {
+                            ref.read(selectedLanguageProvider.notifier).state =
+                                lang;
+                            // Auto-select first source of this language
+                            final first = lang == 'all'
+                                ? orderedIds.firstOrNull
+                                : orderedIds.firstWhere(
+                                    (id) => sourceById(id)?.language == lang,
+                                    orElse: () => orderedIds.first,
+                                  );
+                            if (first != null) {
+                              ref.read(selectedSourceIdProvider.notifier).state =
+                                  first;
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selectedLang == lang ? c.ink : c.wool,
+                              borderRadius: const BorderRadius.all(
+                                Radius.circular(radiusPill),
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                height: 1,
+                                color: selectedLang == lang ? c.paper : c.slate,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
             // ── Source chips (drag to reorder) ────────────────────────────────
             SliverToBoxAdapter(
               child: SizedBox(
@@ -97,9 +168,9 @@ class BrowseScreen extends ConsumerWidget {
                   onReorder: (oldIndex, newIndex) => ref
                       .read(sourceOrderProvider.notifier)
                       .reorder(oldIndex, newIndex),
-                  itemCount: orderedIds.length,
+                  itemCount: filteredIds.length,
                   itemBuilder: (context, i) {
-                    final sourceId = orderedIds[i];
+                    final sourceId = filteredIds[i];
                     final source = sourceById(sourceId);
                     if (source == null) {
                       return SizedBox.shrink(key: ValueKey(sourceId));

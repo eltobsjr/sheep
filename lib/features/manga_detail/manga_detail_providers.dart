@@ -12,6 +12,13 @@ import '../../data/db/database_provider.dart';
 import '../../data/settings/settings_repository.dart';
 import '../../data/sources/source_registry.dart';
 
+// Watches download queue entry for a specific chapter.
+final chapterDownloadEntryProvider =
+    StreamProvider.autoDispose.family<DownloadQueueData?, String>(
+  (ref, chapterId) =>
+      ref.watch(databaseProvider).watchDownloadEntry(chapterId),
+);
+
 // Watches the manga row from Drift by ID.
 final mangaWatchProvider =
     StreamProvider.autoDispose.family<Manga?, String>((ref, mangaId) {

@@ -5,6 +5,10 @@ import '../../data/sources/manga_source.dart';
 import '../../data/sources/source_registry.dart';
 import '../../domain/models/manga.dart';
 
+// Currently selected language filter in Browse: 'all', 'pt-br', 'en'
+final selectedLanguageProvider =
+    StateProvider<String>((ref) => 'all');
+
 // Currently selected source ID in Browse.
 final selectedSourceIdProvider =
     StateProvider<String>((ref) => allSources.first.id);

@@ -38,6 +38,9 @@ class TaiyoSource extends HttpMangaSource {
   String get iconAsset => 'assets/svg/sources/taiyo.svg';
 
   @override
+  String get language => 'pt-br';
+
+  @override
   Map<String, String> get defaultHeaders => {
         ...super.defaultHeaders,
         'Referer': 'https://taiyo.moe/',

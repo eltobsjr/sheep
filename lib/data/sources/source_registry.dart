@@ -3,7 +3,6 @@ import 'manga_source.dart';
 import 'mangadex/mangadex_source.dart';
 import 'mangafire/mangafire_source.dart';
 import 'mangaflix/mangaflix_source.dart';
-import 'mangalivre/mangalivre_source.dart';
 import 'taiyo/taiyo_source.dart';
 import 'weebcentral/weeb_central_source.dart';
 
@@ -13,12 +12,11 @@ import 'weebcentral/weeb_central_source.dart';
 final List<MangaSource> allSources = [
   // ── API sources (most reliable, no scraping) ──────────────────────────────
   MangaDexSource(),
-  MangaDexSource(lang: 'en'),
   MangaFlixSource(),
-  MangaLivreSource(),
 
   // ── Madara (WordPress WP-Manga) — PT-BR ───────────────────────────────────
   MangaOnlineSource(),
+  NebulosaScanSource(),
 
   // ── HTML scrapers — EN ────────────────────────────────────────────────────
   WeebCentralSource(),
@@ -26,6 +24,9 @@ final List<MangaSource> allSources = [
 
   // ── Next.js tRPC — PT-BR ─────────────────────────────────────────────────
   TaiyoSource(),
+
+  // ── API — EN ─────────────────────────────────────────────────────────────
+  MangaDexSource(lang: 'en'),
 ];
 
 // Look up a source by its id.
