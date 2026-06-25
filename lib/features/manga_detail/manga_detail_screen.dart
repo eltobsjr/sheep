@@ -157,15 +157,18 @@ class _DetailBody extends ConsumerWidget {
                       children: [
                         GestureDetector(
                           onTap: () => context.pop(),
-                          child: SvgPicture.string(
-                            '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"'
-                            ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
-                            ' stroke-linejoin="round"><path d="M12 4L5 10l7 6"/></svg>',
-                            width: 20,
-                            height: 20,
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 10, 16, 10),
+                            child: SvgPicture.string(
+                              '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"'
+                              ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
+                              ' stroke-linejoin="round"><path d="M12 4L5 10l7 6"/></svg>',
+                              width: 20,
+                              height: 20,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
                         const Text(
                           'Voltar',
                           style: TextStyle(
@@ -631,11 +634,14 @@ class _ChapterRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Download / checkmark button
+            // Download / checkmark button — área de toque 44×44
             GestureDetector(
               onTap: onDownload,
               behavior: HitTestBehavior.opaque,
-              child: _ChapterActionButton(chapter: chapter, c: c),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: _ChapterActionButton(chapter: chapter, c: c),
+              ),
             ),
           ],
         ),

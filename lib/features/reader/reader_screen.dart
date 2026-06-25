@@ -284,24 +284,30 @@ class _Overlay extends StatelessWidget {
       children: [
         // Back button (top left)
         Positioned(
-          left: 16,
-          top: topPad + 10,
+          left: 8,
+          top: topPad + 4,
           child: GestureDetector(
             onTap: onBack,
+            behavior: HitTestBehavior.opaque,
             child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: Color(0x8C0A0A0A),
-                shape: BoxShape.circle,
-              ),
+              width: 44,
+              height: 44,
               alignment: Alignment.center,
-              child: SvgPicture.string(
-                '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"'
-                ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
-                ' stroke-linejoin="round"><path d="M11 4L5 9l6 5"/></svg>',
-                width: 18,
-                height: 18,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: Color(0x8C0A0A0A),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: SvgPicture.string(
+                  '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"'
+                  ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
+                  ' stroke-linejoin="round"><path d="M11 4L5 9l6 5"/></svg>',
+                  width: 18,
+                  height: 18,
+                ),
               ),
             ),
           ),

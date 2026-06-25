@@ -50,7 +50,12 @@ class BrowseScreen extends ConsumerWidget {
                     ),
                     GestureDetector(
                       onTap: () => context.push('/browse/search'),
+                      behavior: HitTestBehavior.opaque,
                       child: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        child: Container(
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
@@ -67,6 +72,7 @@ class BrowseScreen extends ConsumerWidget {
                           width: 16,
                           height: 16,
                           colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
+                        ),
                         ),
                       ),
                     ),

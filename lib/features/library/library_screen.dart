@@ -183,7 +183,12 @@ class _FilledState extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: onSearchTap,
+                  behavior: HitTestBehavior.opaque,
                   child: Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    child: Container(
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
@@ -200,6 +205,7 @@ class _FilledState extends StatelessWidget {
                       width: 16,
                       height: 16,
                       colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
+                    ),
                     ),
                   ),
                 ),
