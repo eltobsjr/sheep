@@ -1508,6 +1508,379 @@ class DownloadQueueCompanion extends UpdateCompanion<DownloadQueueData> {
   }
 }
 
+class $SourceCredentialsTable extends SourceCredentials
+    with TableInfo<$SourceCredentialsTable, SourceCredential> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SourceCredentialsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _passwordMeta = const VerificationMeta(
+    'password',
+  );
+  @override
+  late final GeneratedColumn<String> password = GeneratedColumn<String>(
+    'password',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _extraJsonMeta = const VerificationMeta(
+    'extraJson',
+  );
+  @override
+  late final GeneratedColumn<String> extraJson = GeneratedColumn<String>(
+    'extra_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sourceId,
+    username,
+    password,
+    extraJson,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'source_credentials';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SourceCredential> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    }
+    if (data.containsKey('password')) {
+      context.handle(
+        _passwordMeta,
+        password.isAcceptableOrUnknown(data['password']!, _passwordMeta),
+      );
+    }
+    if (data.containsKey('extra_json')) {
+      context.handle(
+        _extraJsonMeta,
+        extraJson.isAcceptableOrUnknown(data['extra_json']!, _extraJsonMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sourceId};
+  @override
+  SourceCredential map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SourceCredential(
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      ),
+      password: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}password'],
+      ),
+      extraJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extra_json'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $SourceCredentialsTable createAlias(String alias) {
+    return $SourceCredentialsTable(attachedDatabase, alias);
+  }
+}
+
+class SourceCredential extends DataClass
+    implements Insertable<SourceCredential> {
+  final String sourceId;
+  final String? username;
+  final String? password;
+  final String? extraJson;
+  final DateTime? updatedAt;
+  const SourceCredential({
+    required this.sourceId,
+    this.username,
+    this.password,
+    this.extraJson,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_id'] = Variable<String>(sourceId);
+    if (!nullToAbsent || username != null) {
+      map['username'] = Variable<String>(username);
+    }
+    if (!nullToAbsent || password != null) {
+      map['password'] = Variable<String>(password);
+    }
+    if (!nullToAbsent || extraJson != null) {
+      map['extra_json'] = Variable<String>(extraJson);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  SourceCredentialsCompanion toCompanion(bool nullToAbsent) {
+    return SourceCredentialsCompanion(
+      sourceId: Value(sourceId),
+      username: username == null && nullToAbsent
+          ? const Value.absent()
+          : Value(username),
+      password: password == null && nullToAbsent
+          ? const Value.absent()
+          : Value(password),
+      extraJson: extraJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(extraJson),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory SourceCredential.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SourceCredential(
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      username: serializer.fromJson<String?>(json['username']),
+      password: serializer.fromJson<String?>(json['password']),
+      extraJson: serializer.fromJson<String?>(json['extraJson']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'sourceId': serializer.toJson<String>(sourceId),
+      'username': serializer.toJson<String?>(username),
+      'password': serializer.toJson<String?>(password),
+      'extraJson': serializer.toJson<String?>(extraJson),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  SourceCredential copyWith({
+    String? sourceId,
+    Value<String?> username = const Value.absent(),
+    Value<String?> password = const Value.absent(),
+    Value<String?> extraJson = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => SourceCredential(
+    sourceId: sourceId ?? this.sourceId,
+    username: username.present ? username.value : this.username,
+    password: password.present ? password.value : this.password,
+    extraJson: extraJson.present ? extraJson.value : this.extraJson,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  SourceCredential copyWithCompanion(SourceCredentialsCompanion data) {
+    return SourceCredential(
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      username: data.username.present ? data.username.value : this.username,
+      password: data.password.present ? data.password.value : this.password,
+      extraJson: data.extraJson.present ? data.extraJson.value : this.extraJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SourceCredential(')
+          ..write('sourceId: $sourceId, ')
+          ..write('username: $username, ')
+          ..write('password: $password, ')
+          ..write('extraJson: $extraJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(sourceId, username, password, extraJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SourceCredential &&
+          other.sourceId == this.sourceId &&
+          other.username == this.username &&
+          other.password == this.password &&
+          other.extraJson == this.extraJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SourceCredentialsCompanion extends UpdateCompanion<SourceCredential> {
+  final Value<String> sourceId;
+  final Value<String?> username;
+  final Value<String?> password;
+  final Value<String?> extraJson;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const SourceCredentialsCompanion({
+    this.sourceId = const Value.absent(),
+    this.username = const Value.absent(),
+    this.password = const Value.absent(),
+    this.extraJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SourceCredentialsCompanion.insert({
+    required String sourceId,
+    this.username = const Value.absent(),
+    this.password = const Value.absent(),
+    this.extraJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : sourceId = Value(sourceId);
+  static Insertable<SourceCredential> custom({
+    Expression<String>? sourceId,
+    Expression<String>? username,
+    Expression<String>? password,
+    Expression<String>? extraJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceId != null) 'source_id': sourceId,
+      if (username != null) 'username': username,
+      if (password != null) 'password': password,
+      if (extraJson != null) 'extra_json': extraJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SourceCredentialsCompanion copyWith({
+    Value<String>? sourceId,
+    Value<String?>? username,
+    Value<String?>? password,
+    Value<String?>? extraJson,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SourceCredentialsCompanion(
+      sourceId: sourceId ?? this.sourceId,
+      username: username ?? this.username,
+      password: password ?? this.password,
+      extraJson: extraJson ?? this.extraJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (password.present) {
+      map['password'] = Variable<String>(password.value);
+    }
+    if (extraJson.present) {
+      map['extra_json'] = Variable<String>(extraJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SourceCredentialsCompanion(')
+          ..write('sourceId: $sourceId, ')
+          ..write('username: $username, ')
+          ..write('password: $password, ')
+          ..write('extraJson: $extraJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1517,6 +1890,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $DownloadQueueTable downloadQueue = $DownloadQueueTable(this);
+  late final $SourceCredentialsTable sourceCredentials =
+      $SourceCredentialsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1526,6 +1901,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     chapters,
     readingProgress,
     downloadQueue,
+    sourceCredentials,
   ];
 }
 
@@ -2794,6 +3170,219 @@ typedef $$DownloadQueueTableProcessedTableManager =
       DownloadQueueData,
       PrefetchHooks Function()
     >;
+typedef $$SourceCredentialsTableCreateCompanionBuilder =
+    SourceCredentialsCompanion Function({
+      required String sourceId,
+      Value<String?> username,
+      Value<String?> password,
+      Value<String?> extraJson,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$SourceCredentialsTableUpdateCompanionBuilder =
+    SourceCredentialsCompanion Function({
+      Value<String> sourceId,
+      Value<String?> username,
+      Value<String?> password,
+      Value<String?> extraJson,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$SourceCredentialsTableFilterComposer
+    extends Composer<_$AppDatabase, $SourceCredentialsTable> {
+  $$SourceCredentialsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get password => $composableBuilder(
+    column: $table.password,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extraJson => $composableBuilder(
+    column: $table.extraJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SourceCredentialsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SourceCredentialsTable> {
+  $$SourceCredentialsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get password => $composableBuilder(
+    column: $table.password,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get extraJson => $composableBuilder(
+    column: $table.extraJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SourceCredentialsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SourceCredentialsTable> {
+  $$SourceCredentialsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get password =>
+      $composableBuilder(column: $table.password, builder: (column) => column);
+
+  GeneratedColumn<String> get extraJson =>
+      $composableBuilder(column: $table.extraJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$SourceCredentialsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SourceCredentialsTable,
+          SourceCredential,
+          $$SourceCredentialsTableFilterComposer,
+          $$SourceCredentialsTableOrderingComposer,
+          $$SourceCredentialsTableAnnotationComposer,
+          $$SourceCredentialsTableCreateCompanionBuilder,
+          $$SourceCredentialsTableUpdateCompanionBuilder,
+          (
+            SourceCredential,
+            BaseReferences<
+              _$AppDatabase,
+              $SourceCredentialsTable,
+              SourceCredential
+            >,
+          ),
+          SourceCredential,
+          PrefetchHooks Function()
+        > {
+  $$SourceCredentialsTableTableManager(
+    _$AppDatabase db,
+    $SourceCredentialsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SourceCredentialsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SourceCredentialsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SourceCredentialsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> sourceId = const Value.absent(),
+                Value<String?> username = const Value.absent(),
+                Value<String?> password = const Value.absent(),
+                Value<String?> extraJson = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SourceCredentialsCompanion(
+                sourceId: sourceId,
+                username: username,
+                password: password,
+                extraJson: extraJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sourceId,
+                Value<String?> username = const Value.absent(),
+                Value<String?> password = const Value.absent(),
+                Value<String?> extraJson = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SourceCredentialsCompanion.insert(
+                sourceId: sourceId,
+                username: username,
+                password: password,
+                extraJson: extraJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SourceCredentialsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SourceCredentialsTable,
+      SourceCredential,
+      $$SourceCredentialsTableFilterComposer,
+      $$SourceCredentialsTableOrderingComposer,
+      $$SourceCredentialsTableAnnotationComposer,
+      $$SourceCredentialsTableCreateCompanionBuilder,
+      $$SourceCredentialsTableUpdateCompanionBuilder,
+      (
+        SourceCredential,
+        BaseReferences<
+          _$AppDatabase,
+          $SourceCredentialsTable,
+          SourceCredential
+        >,
+      ),
+      SourceCredential,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2806,4 +3395,6 @@ class $AppDatabaseManager {
       $$ReadingProgressTableTableManager(_db, _db.readingProgress);
   $$DownloadQueueTableTableManager get downloadQueue =>
       $$DownloadQueueTableTableManager(_db, _db.downloadQueue);
+  $$SourceCredentialsTableTableManager get sourceCredentials =>
+      $$SourceCredentialsTableTableManager(_db, _db.sourceCredentials);
 }

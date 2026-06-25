@@ -48,3 +48,18 @@ class DownloadQueue extends Table {
   IntColumn get retries =>
       integer().withDefault(const Constant(0))();
 }
+
+// Stores per-source login credentials and arbitrary auth tokens.
+// Used by SourceAuth implementations to persist session across restarts.
+class SourceCredentials extends Table {
+  TextColumn get sourceId => text()();
+  TextColumn get username => text().nullable()();
+  TextColumn get password => text().nullable()();
+  // Arbitrary JSON for source-specific extras (tokens, refresh keys, etc.)
+  TextColumn get extraJson => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  // ignore: strict_raw_types
+  Set<Column> get primaryKey => {sourceId};
+}
