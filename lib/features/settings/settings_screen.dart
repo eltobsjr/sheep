@@ -3,15 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/tokens.dart';
-
-// ── Providers ─────────────────────────────────────────────────────────────────
-
-final readingModeProvider = StateProvider<String>((ref) => 'paginated');
-final readingDirectionProvider = StateProvider<String>((ref) => 'rtl');
-final keepScreenOnProvider = StateProvider<bool>((ref) => true);
-final wifiOnlyProvider = StateProvider<bool>((ref) => true);
-final imageQualityProvider = StateProvider<String>((ref) => 'high');
-final themeProvider = StateProvider<String>((ref) => 'light');
+import '../../data/settings/settings_repository.dart';
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -20,6 +12,9 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(settingsProvider);
+    final n = ref.read(settingsProvider.notifier);
+
     return Scaffold(
       backgroundColor: paper,
       body: SafeArea(
@@ -42,7 +37,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
 
-            // ── Reading section ───────────────────────────────────────────────
+            // ── Reading ───────────────────────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionLabel('Reading')),
 
             SliverToBoxAdapter(
@@ -50,9 +45,8 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Default mode',
                 options: const ['Paginated', 'Scroll'],
                 values: const ['paginated', 'scroll'],
-                selected: ref.watch(readingModeProvider),
-                onChanged: (v) =>
-                    ref.read(readingModeProvider.notifier).state = v,
+                selected: s.readingMode,
+                onChanged: n.setReadingMode,
               ),
             ),
 
@@ -61,42 +55,36 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Direction',
                 options: const ['→ L to R', 'R to L ←'],
                 values: const ['ltr', 'rtl'],
-                selected: ref.watch(readingDirectionProvider),
-                onChanged: (v) =>
-                    ref.read(readingDirectionProvider.notifier).state = v,
+                selected: s.direction,
+                onChanged: n.setDirection,
               ),
             ),
 
             SliverToBoxAdapter(
               child: _ToggleRow(
                 label: 'Keep screen on',
-                value: ref.watch(keepScreenOnProvider),
-                onChanged: (v) =>
-                    ref.read(keepScreenOnProvider.notifier).state = v,
+                value: s.keepScreenOn,
+                onChanged: n.setKeepScreenOn,
               ),
             ),
 
-            // ── Downloads section ─────────────────────────────────────────────
+            // ── Downloads ─────────────────────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionLabel('Downloads')),
 
             SliverToBoxAdapter(
               child: _ToggleRow(
                 label: 'Wi-Fi only',
                 subtitle: 'Skip mobile data',
-                value: ref.watch(wifiOnlyProvider),
-                onChanged: (v) =>
-                    ref.read(wifiOnlyProvider.notifier).state = v,
+                value: s.wifiOnly,
+                onChanged: n.setWifiOnly,
               ),
             ),
 
             const SliverToBoxAdapter(
-              child: _ChevronRow(
-                label: 'Image quality',
-                value: 'High',
-              ),
+              child: _ChevronRow(label: 'Image quality', value: 'High'),
             ),
 
-            // ── Appearance section ────────────────────────────────────────────
+            // ── Appearance ───────────────────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionLabel('Appearance')),
 
             SliverToBoxAdapter(
@@ -104,13 +92,12 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Theme',
                 options: const ['Light', 'Dark'],
                 values: const ['light', 'dark'],
-                selected: ref.watch(themeProvider),
-                onChanged: (v) =>
-                    ref.read(themeProvider.notifier).state = v,
+                selected: s.theme,
+                onChanged: n.setTheme,
               ),
             ),
 
-            // ── About section ─────────────────────────────────────────────────
+            // ── About ────────────────────────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionLabel('About')),
 
             const SliverToBoxAdapter(child: _AboutRow()),
@@ -254,7 +241,11 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 14, height: 1.2, color: ink),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.2,
+                    color: ink,
+                  ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
@@ -277,7 +268,7 @@ class _ToggleRow extends StatelessWidget {
   }
 }
 
-// ── Toggle widget (44×24px custom) ───────────────────────────────────────────
+// ── Toggle widget (44×24 custom) ──────────────────────────────────────────────
 
 class _Toggle extends StatelessWidget {
   const _Toggle({required this.value});
@@ -342,11 +333,7 @@ class _ChevronRow extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1,
-                  color: slate,
-                ),
+                style: const TextStyle(fontSize: 13, height: 1, color: slate),
               ),
               const SizedBox(width: 4),
               SvgPicture.string(
@@ -427,21 +414,21 @@ class _AboutRow extends StatelessWidget {
             ),
           ),
           Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: const BoxDecoration(
-                color: wool,
-                borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
-              ),
-              child: const Text(
-                'Source ↗',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                  height: 1,
-                  color: ink,
-                ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: const BoxDecoration(
+              color: wool,
+              borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+            ),
+            child: const Text(
+              'Source ↗',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+                height: 1,
+                color: ink,
               ),
             ),
+          ),
         ],
       ),
     );

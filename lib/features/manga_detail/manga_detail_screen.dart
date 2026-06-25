@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/app_database.dart';
+import '../../data/download/download_provider.dart';
 import 'manga_detail_providers.dart';
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -409,7 +410,14 @@ class _DetailBody extends ConsumerWidget {
                     child: Center(child: WoolLoading(size: 60)),
                   )
                 else
-                  ...chapters.map((ch) => _ChapterRow(chapter: ch)),
+                  ...chapters.map((ch) => _ChapterRow(
+                    chapter: ch,
+                    onDownload: ch.isDownloaded
+                        ? null
+                        : () => ref
+                            .read(downloadServiceProvider)
+                            .queue(ch.id),
+                  )),
 
                 const SizedBox(height: 20),
               ],
@@ -459,9 +467,10 @@ class _Chip extends StatelessWidget {
 // ── Chapter row ───────────────────────────────────────────────────────────────
 
 class _ChapterRow extends StatelessWidget {
-  const _ChapterRow({required this.chapter});
+  const _ChapterRow({required this.chapter, this.onDownload});
 
   final Chapter chapter;
+  final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +534,10 @@ class _ChapterRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           // Action button
-          _ChapterActionButton(chapter: chapter),
+          GestureDetector(
+            onTap: onDownload,
+            child: _ChapterActionButton(chapter: chapter),
+          ),
         ],
       ),
     );

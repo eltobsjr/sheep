@@ -203,6 +203,72 @@ class AppDatabase extends _$AppDatabase {
     ),
   );
 
+  // ── Download queue ────────────────────────────────────────────────────────
+
+  // Enqueues a chapter for download (no-op if already queued).
+  Future<void> queueDownload(String chapterId) async {
+    final existing = await (select(downloadQueue)
+          ..where((d) => d.chapterId.equals(chapterId)))
+        .getSingleOrNull();
+    if (existing != null) return;
+    await into(downloadQueue).insert(
+      DownloadQueueCompanion.insert(chapterId: chapterId, status: 'queued'),
+    );
+  }
+
+  // Returns the next chapter waiting to be downloaded.
+  Future<DownloadQueueData?> nextQueuedDownload() =>
+      (select(downloadQueue)
+            ..where((d) => d.status.equals('queued'))
+            ..limit(1))
+          .getSingleOrNull();
+
+  // Updates the download progress (0–100) for a chapter.
+  Future<void> updateDownloadProgress(String chapterId, int progress) =>
+      (update(downloadQueue)..where((d) => d.chapterId.equals(chapterId)))
+          .write(DownloadQueueCompanion(progress: Value(progress)));
+
+  // Sets the queue status for a chapter ('downloading', 'queued', etc.).
+  Future<void> setDownloadStatus(String chapterId, String status) =>
+      (update(downloadQueue)..where((d) => d.chapterId.equals(chapterId)))
+          .write(DownloadQueueCompanion(status: Value(status)));
+
+  // Marks a chapter as fully downloaded and removes it from the queue.
+  Future<void> markChapterDownloaded(
+    String chapterId,
+    String localPath,
+  ) async {
+    await (update(chapters)..where((c) => c.id.equals(chapterId))).write(
+      ChaptersCompanion(
+        isDownloaded: const Value(true),
+        localPath: Value(localPath),
+      ),
+    );
+    await (delete(downloadQueue)
+          ..where((d) => d.chapterId.equals(chapterId)))
+        .go();
+  }
+
+  // On failure: retries up to 3 times, then removes from queue.
+  Future<void> markDownloadFailed(String chapterId) async {
+    final row = await (select(downloadQueue)
+          ..where((d) => d.chapterId.equals(chapterId)))
+        .getSingleOrNull();
+    if (row == null) return;
+    if (row.retries >= 3) {
+      await (delete(downloadQueue)
+            ..where((d) => d.chapterId.equals(chapterId)))
+          .go();
+    } else {
+      await (update(downloadQueue)
+            ..where((d) => d.chapterId.equals(chapterId)))
+          .write(DownloadQueueCompanion(
+        status: const Value('queued'),
+        retries: Value(row.retries + 1),
+      ));
+    }
+  }
+
   // Watches the single most recently read chapter (for "Continue Reading").
   Stream<LastReadEntry?> watchLastRead() {
     final q = select(readingProgress).join([

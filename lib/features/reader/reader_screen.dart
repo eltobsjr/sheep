@@ -6,11 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/app_database.dart';
 import '../../data/db/database_provider.dart';
+import '../../data/settings/settings_repository.dart';
 import '../../domain/models/page_image.dart';
 import 'reader_providers.dart';
 
@@ -40,18 +42,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void initState() {
     super.initState();
     _pageCtrl = PageController();
-    // Auto-hide overlay after 3 seconds
     _scheduleOverlayHide();
-    // Go full-screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    final keepOn = ref.read(settingsProvider).keepScreenOn;
+    if (keepOn) WakelockPlus.enable();
   }
 
   @override
   void dispose() {
     _pageCtrl.dispose();
     _overlayTimer?.cancel();
-    // Restore system UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    WakelockPlus.disable();
     super.dispose();
   }
 
