@@ -6,11 +6,16 @@ class MangaSummary {
     required this.sourceId,
     required this.title,
     required this.coverUrl,
-  });
+    this.author = '',
+    String? url,
+  }) : url = url ?? id;
   final String id;
   final String sourceId;
   final String title;
   final String coverUrl;
+  final String author;
+  // URL or ID used as argument to MangaSource.getDetails() / getChapters().
+  final String url;
 }
 
 class MangaDetails {

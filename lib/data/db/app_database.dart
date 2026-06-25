@@ -87,6 +87,23 @@ class AppDatabase extends _$AppDatabase {
     await batch((b) => b.insertAllOnConflictUpdate(chapters, rows));
   }
 
+  // Saves a manga summary to DB (does NOT overwrite inLibrary or detailed fields).
+  Future<void> saveSummary({
+    required String id,
+    required String sourceId,
+    required String title,
+    required String url,
+  }) => into(mangas).insertOnConflictUpdate(
+    MangasCompanion.insert(
+      id: id,
+      sourceId: sourceId,
+      title: title,
+      coverPath: '',
+      status: 'unknown',
+      url: Value(url),
+    ),
+  );
+
   // Watches the single most recently read chapter (for "Continue Reading").
   Stream<LastReadEntry?> watchLastRead() {
     final q = select(readingProgress).join([

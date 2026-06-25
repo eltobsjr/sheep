@@ -85,6 +85,7 @@ class MangaDexSource extends HttpMangaSource {
       sourceId: id,
       title: _title(attrs['title'] as Map<String, dynamic>),
       coverUrl: _coverUrl(mangaId, _coverFileName(rels)),
+      author: _authors(rels).firstOrNull ?? '',
     );
   }
 
@@ -99,7 +100,7 @@ class MangaDexSource extends HttpMangaSource {
         'availableTranslatedLanguage[]': lang,
         'limit': _pageLimit,
         'offset': (page - 1) * _pageLimit,
-        'includes[]': 'cover_art',
+        'includes[]': ['cover_art', 'author', 'artist'],
       },
     );
     final body = response.data as Map<String, dynamic>;
@@ -139,7 +140,7 @@ class MangaDexSource extends HttpMangaSource {
       queryParameters: <String, dynamic>{
         'ids[]': ids.toList(),
         'limit': ids.length,
-        'includes[]': 'cover_art',
+        'includes[]': ['cover_art', 'author', 'artist'],
       },
     );
     final mangaBody = mangaRes.data as Map<String, dynamic>;
@@ -155,7 +156,7 @@ class MangaDexSource extends HttpMangaSource {
         'title': query,
         'limit': _pageLimit,
         'offset': (page - 1) * _pageLimit,
-        'includes[]': 'cover_art',
+        'includes[]': ['cover_art', 'author', 'artist'],
         'availableTranslatedLanguage[]': lang,
       },
     );
