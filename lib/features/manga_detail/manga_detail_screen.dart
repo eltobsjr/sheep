@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class MangaDetailScreen extends StatelessWidget {
-  const MangaDetailScreen({super.key, required this.mangaId});
+  const MangaDetailScreen({required this.mangaId, super.key});
 
   final String mangaId;
 

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 class ReaderScreen extends StatelessWidget {
   const ReaderScreen({
-    super.key,
     required this.mangaId,
     required this.chapterId,
+    super.key,
   });
 
   final String mangaId;

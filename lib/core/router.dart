@@ -1,18 +1,20 @@
 import 'package:go_router/go_router.dart';
-import 'widgets/scaffold_with_nav_bar.dart';
-import '../features/library/library_screen.dart';
+
 import '../features/browse/browse_screen.dart';
 import '../features/browse/search_screen.dart';
+import '../features/downloads/downloads_screen.dart';
+import '../features/library/library_screen.dart';
 import '../features/manga_detail/manga_detail_screen.dart';
 import '../features/reader/reader_screen.dart';
-import '../features/downloads/downloads_screen.dart';
 import '../features/settings/settings_screen.dart';
+import 'widgets/scaffold_with_nav_bar.dart';
 
 final router = GoRouter(
   initialLocation: '/library',
   routes: [
     StatefulShellRoute.indexedStack(
-      builder: (context, state, shell) => ScaffoldWithNavBar(navigationShell: shell),
+      builder: (context, state, shell) =>
+          ScaffoldWithNavBar(navigationShell: shell),
       branches: [
         StatefulShellBranch(routes: [
           GoRoute(
@@ -55,8 +57,8 @@ final router = GoRouter(
     GoRoute(
       path: '/reader/:mangaId/:chapterId',
       builder: (context, state) => ReaderScreen(
-        mangaId: state.pathParameters['mangaId']!,
         chapterId: state.pathParameters['chapterId']!,
+        mangaId: state.pathParameters['mangaId']!,
       ),
     ),
   ],

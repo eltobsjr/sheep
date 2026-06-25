@@ -22,7 +22,7 @@ const _iconSettingsActive = '''<svg width="20" height="20" viewBox="0 0 20 20" f
 const _iconSettingsInactive = '''<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#6B6B6B" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3"/><path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1 1M14.9 14.9l1 1M4.1 15.9l1-1M14.9 5.1l1-1"/></svg>''';
 
 class ScaffoldWithNavBar extends StatelessWidget {
-  const ScaffoldWithNavBar({super.key, required this.navigationShell});
+  const ScaffoldWithNavBar({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
@@ -70,7 +70,7 @@ class _BottomNav extends StatelessWidget {
           height: 56,
           decoration: const BoxDecoration(
             color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0x0F000000), width: 1)),
+            border: Border(top: BorderSide(color: Color(0x0F000000))),
           ),
           child: Row(
             children: List.generate(
@@ -124,7 +124,6 @@ class _NavItem extends StatelessWidget {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
