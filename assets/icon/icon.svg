@@ -1,0 +1,39 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background: paper #FAFAFA with rounded corners (Android adaptive safe zone) -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="#FAFAFA"/>
+
+  <!-- Sheep scaled to fit nicely: viewBox 0 0 100 112 → centered in 1024x1024
+       Scale factor: 1024 * 0.72 / 100 = 7.37 → sheep ~737px tall
+       Offset: x = (1024 - 100*7.37) / 2 = (1024-737)/2 = 143.5
+               y = (1024 - 112*7.37) / 2 = (1024-826)/2 = 99 -->
+  <g transform="translate(143, 80) scale(7.37)">
+
+    <!-- Puffs — wool body -->
+    <circle cx="50" cy="68" r="20" fill="#0A0A0A"/>
+    <circle cx="33" cy="65" r="15" fill="#0A0A0A"/>
+    <circle cx="67" cy="65" r="15" fill="#0A0A0A"/>
+    <circle cx="40" cy="50" r="11" fill="#0A0A0A"/>
+    <circle cx="60" cy="51" r="13" fill="#0A0A0A"/>
+    <circle cx="50" cy="47" r="12" fill="#0A0A0A"/>
+
+    <!-- Head -->
+    <ellipse cx="50" cy="29" rx="12" ry="13" fill="#0A0A0A"/>
+
+    <!-- Ears -->
+    <ellipse cx="38" cy="19" rx="6" ry="8" fill="#0A0A0A" transform="rotate(-22 38 19)"/>
+    <ellipse cx="62" cy="19" rx="6" ry="8" fill="#0A0A0A" transform="rotate(22 62 19)"/>
+
+    <!-- Legs -->
+    <rect x="28" y="85" width="9" height="22" rx="4.5" fill="#0A0A0A"/>
+    <rect x="40" y="86" width="9" height="22" rx="4.5" fill="#0A0A0A"/>
+    <rect x="51" y="86" width="9" height="22" rx="4.5" fill="#0A0A0A"/>
+    <rect x="63" y="85" width="9" height="22" rx="4.5" fill="#0A0A0A"/>
+
+    <!-- Eyes -->
+    <circle cx="45" cy="26" r="2.5" fill="#FAFAFA"/>
+    <circle cx="55" cy="26" r="2.5" fill="#FAFAFA"/>
+
+    <!-- Mouth -->
+    <ellipse cx="50" cy="33" rx="3.5" ry="2.5" fill="#FAFAFA" opacity=".55"/>
+  </g>
+</svg>
