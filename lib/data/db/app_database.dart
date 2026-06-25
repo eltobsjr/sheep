@@ -87,6 +87,30 @@ class AppDatabase extends _$AppDatabase {
     await batch((b) => b.insertAllOnConflictUpdate(chapters, rows));
   }
 
+  // Watches a single chapter by its ID.
+  Stream<Chapter?> watchChapterById(String chapterId) =>
+      (select(chapters)..where((c) => c.id.equals(chapterId)))
+          .watchSingleOrNull();
+
+  // Saves reading progress (page number) for a chapter.
+  Future<void> saveReadingProgress({
+    required String chapterId,
+    required int lastPage,
+    int? pageCount,
+  }) async {
+    if (pageCount != null) {
+      await (update(chapters)..where((c) => c.id.equals(chapterId)))
+          .write(ChaptersCompanion(pageCount: Value(pageCount)));
+    }
+    await into(readingProgress).insertOnConflictUpdate(
+      ReadingProgressCompanion(
+        chapterId: Value(chapterId),
+        lastPage: Value(lastPage),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   // Saves a manga summary to DB (does NOT overwrite inLibrary or detailed fields).
   Future<void> saveSummary({
     required String id,
