@@ -289,3 +289,16 @@ class NebulosaScanSource extends MadaraSource {
   String get language => 'pt-br';
 }
 
+class MangaLivreToSource extends MadaraSource {
+  @override
+  String get id => 'mangalivretto';
+  @override
+  String get name => 'Manga Livre';
+  @override
+  String get baseUrl => 'https://mangalivre.to';
+  @override
+  String get iconAsset => 'assets/svg/sources/mangalivretto.svg';
+  @override
+  String get language => 'pt-br';
+}
+

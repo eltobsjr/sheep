@@ -1,22 +1,15 @@
 import 'madara/madara_source.dart';
 import 'manga_source.dart';
-import 'mangadex/mangadex_source.dart';
 import 'mangafire/mangafire_source.dart';
 import 'mangaflix/mangaflix_source.dart';
 import 'taiyo/taiyo_source.dart';
 import 'weebcentral/weeb_central_source.dart';
 
-// All sources compiled into the APK.
-// To add a new Madara site: create a class that extends MadaraSource and
-// add an instance here — no other change needed.
 final List<MangaSource> allSources = [
-  // ── API sources (most reliable, no scraping) ──────────────────────────────
-  MangaDexSource(),
-  MangaFlixSource(),
-
   // ── Madara (WordPress WP-Manga) — PT-BR ───────────────────────────────────
+  MangaFlixSource(),
   MangaOnlineSource(),
-  NebulosaScanSource(),
+  MangaLivreToSource(),
 
   // ── HTML scrapers — EN ────────────────────────────────────────────────────
   WeebCentralSource(),
@@ -24,9 +17,6 @@ final List<MangaSource> allSources = [
 
   // ── Next.js tRPC — PT-BR ─────────────────────────────────────────────────
   TaiyoSource(),
-
-  // ── API — EN ─────────────────────────────────────────────────────────────
-  MangaDexSource(lang: 'en'),
 ];
 
 // Look up a source by its id.
