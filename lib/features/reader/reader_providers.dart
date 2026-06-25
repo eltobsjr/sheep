@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/db/app_database.dart';
 import '../../data/db/database_provider.dart';
+import '../../data/settings/settings_repository.dart';
 import '../../data/sources/source_registry.dart';
 import '../../domain/models/page_image.dart';
 import '../../domain/page_source.dart';
@@ -18,22 +19,25 @@ final readerPagesProvider =
     FutureProvider.autoDispose.family<List<PageImage>, String>(
         (ref, chapterId) async {
   final db = ref.read(databaseProvider);
+  final settings = ref.read(settingsProvider);
   final chapter = await db.watchChapterById(chapterId).first;
   if (chapter == null) throw Exception('Chapter $chapterId not found');
 
   final manga = await db.watchManga(chapter.mangaId).first;
   if (manga == null) throw Exception('Manga ${chapter.mangaId} not found');
 
-  final pageSource = _resolvePageSource(chapter, manga.sourceId);
+  final dataSaver = settings.imageQuality == 'low';
+  final pageSource = _resolvePageSource(chapter, manga.sourceId, dataSaver);
   return pageSource.getPages();
 });
 
-PageSource _resolvePageSource(Chapter chapter, String sourceId) {
+PageSource _resolvePageSource(
+    Chapter chapter, String sourceId, bool dataSaver) {
   if (chapter.isDownloaded && chapter.localPath != null) {
     final dir = Directory(chapter.localPath!);
     if (dir.existsSync()) return LocalPageSource(dir);
   }
   final source = sourceById(sourceId);
   if (source == null) throw Exception('Source $sourceId not found');
-  return RemotePageSource(source, chapter.url);
+  return RemotePageSource(source, chapter.url, dataSaver: dataSaver);
 }

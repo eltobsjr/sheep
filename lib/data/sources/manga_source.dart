@@ -12,5 +12,5 @@ abstract class MangaSource {
   Future<List<MangaSummary>> search(String query, int page);
   Future<MangaDetails> getDetails(String mangaUrl);
   Future<List<ChapterSummary>> getChapters(String mangaUrl);
-  Future<List<String>> getPages(String chapterUrl);
+  Future<List<String>> getPages(String chapterUrl, {bool dataSaver = false});
 }

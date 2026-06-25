@@ -3,10 +3,12 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:workmanager/workmanager.dart';
 
 import '../db/app_database.dart';
 import '../sources/http_manga_source.dart';
 import '../sources/source_registry.dart';
+import 'download_worker.dart';
 
 // Downloads chapters from the queue one at a time.
 // Pages are written to a _tmp directory; only after ALL pages succeed is the
@@ -19,10 +21,24 @@ class DownloadService {
 
   Future<void> queue(String chapterId) async {
     await _db.queueDownload(chapterId);
+    // Register a background task so downloads survive the app going to background.
+    // ExistingWorkPolicy.keep: no-op if a task is already scheduled.
+    await Workmanager().registerOneOffTask(
+      kDownloadTaskName,
+      kDownloadTaskName,
+      existingWorkPolicy: ExistingWorkPolicy.keep,
+      constraints: Constraints(networkType: NetworkType.connected),
+    );
     unawaited(_startIfIdle());
   }
 
-  Future<void> _startIfIdle() async {
+  Future<void> _startIfIdle() => processQueue();
+
+  // Public so the background worker (download_worker.dart) can call this.
+  Future<void> processQueue({
+    Future<void> Function(String mangaTitle, String chapterTitle)? onChapterDone,
+    Future<void> Function(String chapterTitle)? onChapterFailed,
+  }) async {
     if (_running) return;
     _running = true;
     try {
@@ -30,9 +46,13 @@ class DownloadService {
         final next = await _db.nextQueuedDownload();
         if (next == null) break;
         try {
-          await _downloadChapter(next.chapterId);
+          final info = await _downloadChapter(next.chapterId);
+          if (onChapterDone != null && info != null) {
+            await onChapterDone(info.$1, info.$2);
+          }
         } catch (_) {
           await _db.markDownloadFailed(next.chapterId);
+          if (onChapterFailed != null) await onChapterFailed(next.chapterId);
         }
       }
     } finally {
@@ -40,12 +60,12 @@ class DownloadService {
     }
   }
 
-  Future<void> _downloadChapter(String chapterId) async {
+  Future<(String, String)?> _downloadChapter(String chapterId) async {
     final chapter = await _db.watchChapterById(chapterId).first;
-    if (chapter == null) return;
+    if (chapter == null) return null;
 
     final manga = await _db.watchManga(chapter.mangaId).first;
-    if (manga == null) return;
+    if (manga == null) return null;
 
     final source = sourceById(manga.sourceId);
     if (source == null) throw Exception('Source not found: ${manga.sourceId}');
@@ -94,5 +114,6 @@ class DownloadService {
     await tmpDir.rename(finalPath);
 
     await _db.markChapterDownloaded(chapterId, finalPath);
+    return (manga.title, chapter.title);
   }
 }

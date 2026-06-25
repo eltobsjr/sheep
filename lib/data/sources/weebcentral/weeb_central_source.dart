@@ -182,7 +182,8 @@ class WeebCentralSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<String>> getPages(String chapterUrl) async {
+  Future<List<String>> getPages(String chapterUrl,
+      {bool dataSaver = false}) async {
     // chapterUrl = /chapters/{id}
     // images endpoint = /chapters/{id}/images?is_prev=False&reading_style=long_strip
     final html = await fetchHtml(

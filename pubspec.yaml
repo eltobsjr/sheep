@@ -26,6 +26,8 @@ dependencies:
   html: ^0.15.5
   shared_preferences: ^2.3.2
   wakelock_plus: ^1.2.10
+  workmanager: ^0.9.0
+  flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:

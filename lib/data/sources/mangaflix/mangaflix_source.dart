@@ -112,7 +112,8 @@ class MangaFlixSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<String>> getPages(String chapterUrl) async {
+  Future<List<String>> getPages(String chapterUrl,
+      {bool dataSaver = false}) async {
     final response = await client.get<dynamic>(
       '/chapters/$chapterUrl',
       queryParameters: <String, dynamic>{'selected_language': 'pt-br'},

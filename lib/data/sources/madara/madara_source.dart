@@ -212,7 +212,8 @@ abstract class MadaraSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<String>> getPages(String chapterUrl) async {
+  Future<List<String>> getPages(String chapterUrl,
+      {bool dataSaver = false}) async {
     final html = await fetchHtml('$baseUrl$chapterUrl');
     final doc = html_parser.parse(html);
     final images = doc.querySelectorAll(pageSelector);

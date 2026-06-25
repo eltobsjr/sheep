@@ -238,14 +238,13 @@ class _PageViewerState extends State<_PageViewer> {
   @override
   Widget build(BuildContext context) {
     if (widget.isScroll) {
+      // Scroll mode is always top-to-bottom in reading order.
+      // RTL direction only affects paged mode (handled via PageView.reverse).
       return ListView.builder(
         controller: _scrollCtrl,
         physics: const BouncingScrollPhysics(),
         itemCount: widget.pages.length,
-        itemBuilder: (context, index) {
-          final i = widget.isRtl ? widget.pages.length - 1 - index : index;
-          return _buildImage(widget.pages[i]);
-        },
+        itemBuilder: (context, index) => _buildImage(widget.pages[index]),
       );
     }
 

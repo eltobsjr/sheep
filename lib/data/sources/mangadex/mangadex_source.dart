@@ -257,12 +257,18 @@ class MangaDexSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<String>> getPages(String chapterUrl) async {
+  Future<List<String>> getPages(String chapterUrl,
+      {bool dataSaver = false}) async {
     final response = await client.get<dynamic>('/at-home/server/$chapterUrl');
     final body = response.data as Map<String, dynamic>;
     final atHome = body['baseUrl'] as String;
     final chapter = body['chapter'] as Map<String, dynamic>;
     final hash = chapter['hash'] as String;
+
+    if (dataSaver) {
+      final pages = chapter['dataSaver'] as List<dynamic>;
+      return pages.map((p) => '$atHome/data-saver/$hash/${p as String}').toList();
+    }
     final pages = chapter['data'] as List<dynamic>;
     return pages.map((p) => '$atHome/data/$hash/${p as String}').toList();
   }

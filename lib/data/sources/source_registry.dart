@@ -1,6 +1,7 @@
 import 'madara/madara_source.dart';
 import 'manga_source.dart';
 import 'mangadex/mangadex_source.dart';
+import 'mangafire/mangafire_source.dart';
 import 'mangaflix/mangaflix_source.dart';
 import 'mangalivre/mangalivre_source.dart';
 import 'weebcentral/weeb_central_source.dart';
@@ -24,6 +25,7 @@ final List<MangaSource> allSources = [
 
   // ── HTML scrapers — EN ────────────────────────────────────────────────────
   WeebCentralSource(),
+  MangaFireSource(),
 ];
 
 // Look up a source by its id.

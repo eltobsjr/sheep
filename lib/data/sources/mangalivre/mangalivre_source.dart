@@ -141,7 +141,8 @@ class MangaLivreSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<String>> getPages(String chapterUrl) async {
+  Future<List<String>> getPages(String chapterUrl,
+      {bool dataSaver = false}) async {
     final (mangaId, chapterId) = _decodeChapterUrl(chapterUrl);
     final response = await client.get<dynamic>(
       '/api/mangas/$mangaId/chapters/$chapterId',

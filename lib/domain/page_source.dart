@@ -8,13 +8,14 @@ abstract class PageSource {
 }
 
 class RemotePageSource implements PageSource {
-  const RemotePageSource(this.source, this.chapterUrl);
+  const RemotePageSource(this.source, this.chapterUrl, {this.dataSaver = false});
   final MangaSource source;
   final String chapterUrl;
+  final bool dataSaver;
 
   @override
   Future<List<PageImage>> getPages() async {
-    final urls = await source.getPages(chapterUrl);
+    final urls = await source.getPages(chapterUrl, dataSaver: dataSaver);
     return urls.map(NetworkPageImage.new).toList();
   }
 }
