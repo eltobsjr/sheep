@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../theme/sheep_colors.dart';
 import '../theme/tokens.dart';
 
 // SVG icons extracted directly from the Sheep.dc.html prototype
@@ -63,14 +64,17 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = SheepColors.of(context);
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    final navBg = c.paper;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           height: 56,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0x0F000000))),
+          decoration: BoxDecoration(
+            color: navBg,
+            border: Border(top: BorderSide(color: c.border)),
           ),
           child: Row(
             children: List.generate(
@@ -81,23 +85,15 @@ class _BottomNav extends StatelessWidget {
                 inactiveSvg: ScaffoldWithNavBar._inactiveIcons[i],
                 selected: currentIndex == i,
                 onTap: () => onTap(i),
+                c: c,
               ),
             ),
           ),
         ),
+        // System nav bar padding area
         Container(
-          height: 22,
-          color: Colors.white,
-          alignment: Alignment.topCenter,
-          padding: const EdgeInsets.only(top: 9),
-          child: Container(
-            width: 130,
-            height: 4,
-            decoration: BoxDecoration(
-              color: const Color(0x260A0A0A),
-              borderRadius: BorderRadius.circular(radiusPill),
-            ),
-          ),
+          height: bottomPad > 0 ? bottomPad : 0,
+          color: navBg,
         ),
       ],
     );
@@ -111,6 +107,7 @@ class _NavItem extends StatelessWidget {
     required this.inactiveSvg,
     required this.selected,
     required this.onTap,
+    required this.c,
   });
 
   final String label;
@@ -118,6 +115,20 @@ class _NavItem extends StatelessWidget {
   final String inactiveSvg;
   final bool selected;
   final VoidCallback onTap;
+  final SheepColors c;
+
+  String _coloredSvg(String svg) {
+    final activeColor = c.ink.toARGB32().toRadixString(16).substring(2).toUpperCase();
+    final slateColor = c.slate.toARGB32().toRadixString(16).substring(2).toUpperCase();
+    if (selected) {
+      return svg
+          .replaceAll('#0A0A0A', '#$activeColor')
+          .replaceAll('#6B6B6B', '#$activeColor');
+    }
+    return svg
+        .replaceAll('#0A0A0A', '#$slateColor')
+        .replaceAll('#6B6B6B', '#$slateColor');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +138,7 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SvgPicture.string(selected ? activeSvg : inactiveSvg),
+            SvgPicture.string(_coloredSvg(selected ? activeSvg : inactiveSvg)),
             const SizedBox(height: 3),
             Text(
               label,
@@ -135,7 +146,7 @@ class _NavItem extends StatelessWidget {
                 fontFamily: fontDisplay,
                 fontWeight: FontWeight.w700,
                 fontSize: 9,
-                color: selected ? ink : slate,
+                color: selected ? c.ink : c.slate,
               ),
             ),
           ],

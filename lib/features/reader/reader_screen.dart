@@ -33,7 +33,6 @@ class ReaderScreen extends ConsumerStatefulWidget {
 }
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
-  late PageController _pageCtrl;
   int _currentPage = 0;
   bool _overlayVisible = true;
   Timer? _overlayTimer;
@@ -41,7 +40,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   void initState() {
     super.initState();
-    _pageCtrl = PageController();
     _scheduleOverlayHide();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     final keepOn = ref.read(settingsProvider).keepScreenOn;
@@ -50,7 +48,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
-    _pageCtrl.dispose();
     _overlayTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
@@ -82,13 +79,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final isScroll = settings.readingMode == 'scroll';
+    final isRtl = settings.direction == 'rtl';
+
     final chapterAsync = ref.watch(readerChapterProvider(widget.chapterId));
     final pagesAsync = ref.watch(readerPagesProvider(widget.chapterId));
-    final mangaAsync = ref.watch(
-      // Re-use the existing manga provider from manga_detail_providers.
-      // Here we just need the title — watch it simply.
-      _mangaTitleProvider(widget.mangaId),
-    );
+    final mangaTitle = ref.watch(_mangaTitleProvider(widget.mangaId));
 
     return Scaffold(
       backgroundColor: charcoal,
@@ -115,7 +112,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ),
         data: (pages) {
           final chapter = chapterAsync.valueOrNull;
-          final mangaTitle = mangaAsync;
           final chapterLabel = _chapterLabel(mangaTitle, chapter);
 
           return GestureDetector(
@@ -126,7 +122,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 // ── Page viewer ────────────────────────────────────────────
                 _PageViewer(
                   pages: pages,
-                  controller: _pageCtrl,
+                  isScroll: isScroll,
+                  isRtl: isRtl,
                   onPageChanged: (i) => _onPageChanged(i, pages.length),
                 ),
 
@@ -167,47 +164,97 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
 // ── Page viewer ───────────────────────────────────────────────────────────────
 
-class _PageViewer extends StatelessWidget {
+class _PageViewer extends StatefulWidget {
   const _PageViewer({
     required this.pages,
-    required this.controller,
+    required this.isScroll,
+    required this.isRtl,
     required this.onPageChanged,
   });
 
   final List<PageImage> pages;
-  final PageController controller;
+  final bool isScroll;
+  final bool isRtl;
   final void Function(int) onPageChanged;
 
   @override
+  State<_PageViewer> createState() => _PageViewerState();
+}
+
+class _PageViewerState extends State<_PageViewer> {
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final max = _scrollCtrl.position.maxScrollExtent;
+    if (max <= 0) return;
+    final page = (_scrollCtrl.offset / max * (widget.pages.length - 1)).round()
+        .clamp(0, widget.pages.length - 1);
+    widget.onPageChanged(page);
+  }
+
+  Widget _buildImage(PageImage page) {
+    if (page is NetworkPageImage) {
+      return ExtendedImage.network(
+        page.url,
+        fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
+        mode: widget.isScroll ? ExtendedImageMode.none : ExtendedImageMode.gesture,
+        initGestureConfigHandler: widget.isScroll
+            ? null
+            : (_) => GestureConfig(
+                  minScale: 0.9,
+                  maxScale: 4.0,
+                  inPageView: true,
+                ),
+      );
+    }
+    return ExtendedImage.file(
+      (page as FilePageImage).file,
+      fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
+      mode: widget.isScroll ? ExtendedImageMode.none : ExtendedImageMode.gesture,
+      initGestureConfigHandler: widget.isScroll
+          ? null
+          : (_) => GestureConfig(
+                minScale: 0.9,
+                maxScale: 4.0,
+                inPageView: true,
+              ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (widget.isScroll) {
+      return ListView.builder(
+        controller: _scrollCtrl,
+        physics: const BouncingScrollPhysics(),
+        itemCount: widget.pages.length,
+        itemBuilder: (context, index) {
+          final i = widget.isRtl ? widget.pages.length - 1 - index : index;
+          return _buildImage(widget.pages[i]);
+        },
+      );
+    }
+
     return ExtendedImageGesturePageView.builder(
-      itemCount: pages.length,
+      itemCount: widget.pages.length,
       controller: ExtendedPageController(),
-      onPageChanged: onPageChanged,
-      itemBuilder: (context, index) {
-        final page = pages[index];
-        return page is NetworkPageImage
-            ? ExtendedImage.network(
-                page.url,
-                fit: BoxFit.contain,
-                mode: ExtendedImageMode.gesture,
-                initGestureConfigHandler: (_) => GestureConfig(
-                  minScale: 0.9,
-                  maxScale: 4.0,
-                  inPageView: true,
-                ),
-              )
-            : ExtendedImage.file(
-                (page as FilePageImage).file,
-                fit: BoxFit.contain,
-                mode: ExtendedImageMode.gesture,
-                initGestureConfigHandler: (_) => GestureConfig(
-                  minScale: 0.9,
-                  maxScale: 4.0,
-                  inPageView: true,
-                ),
-              );
-      },
+      reverse: widget.isRtl,
+      onPageChanged: widget.onPageChanged,
+      itemBuilder: (context, index) => _buildImage(widget.pages[index]),
     );
   }
 }
@@ -269,7 +316,7 @@ class _Overlay extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: const BoxDecoration(
-                color: Color(0x8C0A0A0A), // rgba(10,10,10,.55)
+                color: Color(0x8C0A0A0A),
                 borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
               ),
               child: Text(
@@ -294,7 +341,7 @@ class _Overlay extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: const BoxDecoration(
-                color: Color(0xB80A0A0A), // rgba(10,10,10,.72)
+                color: Color(0xB80A0A0A),
                 borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
               ),
               child: Text(
@@ -320,7 +367,7 @@ class _Overlay extends StatelessWidget {
               width: 130,
               height: 4,
               decoration: const BoxDecoration(
-                color: Color(0x38FAFAFA), // rgba(250,250,250,.22)
+                color: Color(0x38FAFAFA),
                 borderRadius: BorderRadius.all(Radius.circular(2)),
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../core/widgets/wool_progress.dart';
@@ -15,24 +16,26 @@ class DownloadsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = SheepColors.of(context);
     final activeAsync = ref.watch(activeDownloadsProvider);
     final completedAsync = ref.watch(completedDownloadsProvider);
 
     final active = activeAsync.valueOrNull ?? const [];
     final completed = completedAsync.valueOrNull ?? const [];
-    final totalChapters = active.length + completed.fold(0, (s, e) => s + e.chapterCount);
+    final totalChapters =
+        active.length + completed.fold(0, (s, e) => s + e.chapterCount);
 
     return Scaffold(
-      backgroundColor: paper,
+      backgroundColor: c.paper,
       body: SafeArea(
         child: completedAsync.isLoading && activeAsync.isLoading
             ? const Center(child: WoolLoading())
             : CustomScrollView(
                 slivers: [
                   // ── Header ─────────────────────────────────────────────────
-                  const SliverToBoxAdapter(
+                  SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
                       child: Text(
                         'Downloads',
                         style: TextStyle(
@@ -40,7 +43,7 @@ class DownloadsScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                           fontSize: 28,
                           height: 1.1,
-                          color: ink,
+                          color: c.ink,
                         ),
                       ),
                     ),
@@ -57,22 +60,22 @@ class DownloadsScreen extends ConsumerWidget {
                               horizontal: 16,
                               vertical: 9,
                             ),
-                            decoration: const BoxDecoration(
-                              color: wool,
-                              borderRadius: BorderRadius.all(
+                            decoration: BoxDecoration(
+                              color: c.wool,
+                              borderRadius: const BorderRadius.all(
                                 Radius.circular(radiusPill),
                               ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text(
+                                Text(
                                   '—',
                                   style: TextStyle(
                                     fontFamily: fontMono,
                                     fontSize: 12,
                                     height: 1,
-                                    color: ink,
+                                    color: c.ink,
                                   ),
                                 ),
                                 Container(
@@ -81,18 +84,18 @@ class DownloadsScreen extends ConsumerWidget {
                                   margin: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                   ),
-                                  decoration: const BoxDecoration(
-                                    color: slate,
+                                  decoration: BoxDecoration(
+                                    color: c.slate,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 Text(
                                   '$totalChapters chapters',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: fontMono,
                                     fontSize: 12,
                                     height: 1,
-                                    color: slate,
+                                    color: c.slate,
                                   ),
                                 ),
                               ],
@@ -110,11 +113,11 @@ class DownloadsScreen extends ConsumerWidget {
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                         child: Text(
                           'DOWNLOADING · ${active.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             height: 1,
                             letterSpacing: 10 * 0.08,
-                            color: slate,
+                            color: c.slate,
                           ),
                         ),
                       ),
@@ -122,7 +125,7 @@ class DownloadsScreen extends ConsumerWidget {
                     SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, i) =>
-                            _ActiveDownloadItem(entry: active[i]),
+                            _ActiveDownloadItem(entry: active[i], c: c),
                         childCount: active.length,
                       ),
                     ),
@@ -135,11 +138,11 @@ class DownloadsScreen extends ConsumerWidget {
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                         child: Text(
                           'COMPLETED · ${completed.fold(0, (s, e) => s + e.chapterCount)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             height: 1,
                             letterSpacing: 10 * 0.08,
-                            color: slate,
+                            color: c.slate,
                           ),
                         ),
                       ),
@@ -150,6 +153,7 @@ class DownloadsScreen extends ConsumerWidget {
                           entry: completed[i],
                           onTap: () =>
                               context.push('/manga/${completed[i].mangaId}'),
+                          c: c,
                         ),
                         childCount: completed.length,
                       ),
@@ -158,8 +162,8 @@ class DownloadsScreen extends ConsumerWidget {
 
                   // ── Empty state ─────────────────────────────────────────────
                   if (active.isEmpty && completed.isEmpty)
-                    const SliverFillRemaining(
-                      child: _EmptyDownloads(),
+                    SliverFillRemaining(
+                      child: _EmptyDownloads(c: c),
                     ),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -173,9 +177,10 @@ class DownloadsScreen extends ConsumerWidget {
 // ── Active download item ───────────────────────────────────────────────────────
 
 class _ActiveDownloadItem extends StatelessWidget {
-  const _ActiveDownloadItem({required this.entry});
+  const _ActiveDownloadItem({required this.entry, required this.c});
 
   final ActiveDownloadEntry entry;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -183,15 +188,13 @@ class _ActiveDownloadItem extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0x0F0A0A0A))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.border)),
       ),
       child: Row(
         children: [
-          // Wool progress mascot: 44×50
           WoolProgress(progress: pct / 100),
           const SizedBox(width: 14),
-          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,20 +204,20 @@ class _ActiveDownloadItem extends StatelessWidget {
                   children: [
                     Text(
                       entry.mangaTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                         height: 1.2,
-                        color: ink,
+                        color: c.ink,
                       ),
                     ),
                     Text(
                       '$pct%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: fontMono,
                         fontSize: 13,
                         height: 1,
-                        color: ink,
+                        color: c.ink,
                       ),
                     ),
                   ],
@@ -222,20 +225,20 @@ class _ActiveDownloadItem extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   entry.chapterTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Progress bar
                 ClipRRect(
                   borderRadius: BorderRadius.circular(1),
                   child: LinearProgressIndicator(
                     value: pct / 100,
-                    backgroundColor: const Color(0x1A0A0A0A),
-                    valueColor: const AlwaysStoppedAnimation<Color>(ink),
+                    backgroundColor:
+                        Color.lerp(c.ink, Colors.transparent, 0.9),
+                    valueColor: AlwaysStoppedAnimation<Color>(c.ink),
                     minHeight: 2,
                   ),
                 ),
@@ -251,10 +254,15 @@ class _ActiveDownloadItem extends StatelessWidget {
 // ── Completed item ────────────────────────────────────────────────────────────
 
 class _CompletedItem extends StatelessWidget {
-  const _CompletedItem({required this.entry, required this.onTap});
+  const _CompletedItem({
+    required this.entry,
+    required this.onTap,
+    required this.c,
+  });
 
   final CompletedDownloadEntry entry;
   final VoidCallback onTap;
+  final SheepColors c;
 
   static const _colors = [
     Color(0xFF1A1A2E),
@@ -276,12 +284,11 @@ class _CompletedItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0x0F0A0A0A))),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: c.border)),
         ),
         child: Row(
           children: [
-            // Mini cover: 36×48
             Container(
               width: 36,
               height: 48,
@@ -291,18 +298,17 @@ class _CompletedItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     entry.mangaTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                       height: 1.2,
-                      color: ink,
+                      color: c.ink,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -310,30 +316,25 @@ class _CompletedItem extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     '${entry.chapterCount} ch',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: fontMono,
                       fontSize: 11,
                       height: 1,
-                      color: slate,
+                      color: c.slate,
                     ),
                   ),
                 ],
               ),
             ),
-            // Checkmark circle
             Container(
               width: 24,
               height: 24,
-              decoration: const BoxDecoration(
-                color: wool,
+              decoration: BoxDecoration(
+                color: c.wool,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: const Icon(
-                Icons.check,
-                size: 12,
-                color: ink,
-              ),
+              child: Icon(Icons.check, size: 12, color: c.ink),
             ),
           ],
         ),
@@ -345,17 +346,19 @@ class _CompletedItem extends StatelessWidget {
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyDownloads extends StatelessWidget {
-  const _EmptyDownloads();
+  const _EmptyDownloads({required this.c});
+
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 40),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          WoolLoading(size: 88),
-          SizedBox(height: 20),
+          const WoolLoading(size: 88),
+          const SizedBox(height: 20),
           Text(
             'No downloads yet',
             style: TextStyle(
@@ -363,14 +366,14 @@ class _EmptyDownloads extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 22,
               height: 1.2,
-              color: ink,
+              color: c.ink,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'Download chapters to read them offline',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, height: 1.6, color: slate),
+            style: TextStyle(fontSize: 14, height: 1.6, color: c.slate),
           ),
         ],
       ),

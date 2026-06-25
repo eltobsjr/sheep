@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../data/settings/settings_repository.dart';
 
@@ -12,18 +13,19 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = SheepColors.of(context);
     final s = ref.watch(settingsProvider);
     final n = ref.read(settingsProvider.notifier);
 
     return Scaffold(
-      backgroundColor: paper,
+      backgroundColor: c.paper,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
             // ── Header ───────────────────────────────────────────────────────
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                 child: Text(
                   'Settings',
                   style: TextStyle(
@@ -31,14 +33,14 @@ class SettingsScreen extends ConsumerWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 28,
                     height: 1.1,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
               ),
             ),
 
             // ── Reading ───────────────────────────────────────────────────────
-            const SliverToBoxAdapter(child: _SectionLabel('Reading')),
+            SliverToBoxAdapter(child: _SectionLabel('Reading', c: c)),
 
             SliverToBoxAdapter(
               child: _SegmentedRow(
@@ -47,6 +49,7 @@ class SettingsScreen extends ConsumerWidget {
                 values: const ['paginated', 'scroll'],
                 selected: s.readingMode,
                 onChanged: n.setReadingMode,
+                c: c,
               ),
             ),
 
@@ -57,6 +60,7 @@ class SettingsScreen extends ConsumerWidget {
                 values: const ['ltr', 'rtl'],
                 selected: s.direction,
                 onChanged: n.setDirection,
+                c: c,
               ),
             ),
 
@@ -65,11 +69,12 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Keep screen on',
                 value: s.keepScreenOn,
                 onChanged: n.setKeepScreenOn,
+                c: c,
               ),
             ),
 
             // ── Downloads ─────────────────────────────────────────────────────
-            const SliverToBoxAdapter(child: _SectionLabel('Downloads')),
+            SliverToBoxAdapter(child: _SectionLabel('Downloads', c: c)),
 
             SliverToBoxAdapter(
               child: _ToggleRow(
@@ -77,15 +82,16 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: 'Skip mobile data',
                 value: s.wifiOnly,
                 onChanged: n.setWifiOnly,
+                c: c,
               ),
             ),
 
-            const SliverToBoxAdapter(
-              child: _ChevronRow(label: 'Image quality', value: 'High'),
+            SliverToBoxAdapter(
+              child: _ChevronRow(label: 'Image quality', value: 'High', c: c),
             ),
 
             // ── Appearance ───────────────────────────────────────────────────
-            const SliverToBoxAdapter(child: _SectionLabel('Appearance')),
+            SliverToBoxAdapter(child: _SectionLabel('Appearance', c: c)),
 
             SliverToBoxAdapter(
               child: _SegmentedRow(
@@ -94,13 +100,14 @@ class SettingsScreen extends ConsumerWidget {
                 values: const ['light', 'dark'],
                 selected: s.theme,
                 onChanged: n.setTheme,
+                c: c,
               ),
             ),
 
             // ── About ────────────────────────────────────────────────────────
-            const SliverToBoxAdapter(child: _SectionLabel('About')),
+            SliverToBoxAdapter(child: _SectionLabel('About', c: c)),
 
-            const SliverToBoxAdapter(child: _AboutRow()),
+            SliverToBoxAdapter(child: _AboutRow(c: c)),
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
@@ -113,9 +120,10 @@ class SettingsScreen extends ConsumerWidget {
 // ── Section label ─────────────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
+  const _SectionLabel(this.label, {required this.c});
 
   final String label;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -123,11 +131,11 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           height: 1,
           letterSpacing: 10 * 0.08,
-          color: slate,
+          color: c.slate,
         ),
       ),
     );
@@ -143,6 +151,7 @@ class _SegmentedRow extends StatelessWidget {
     required this.values,
     required this.selected,
     required this.onChanged,
+    required this.c,
   });
 
   final String label;
@@ -150,26 +159,27 @@ class _SegmentedRow extends StatelessWidget {
   final List<String> values;
   final String selected;
   final void Function(String) onChanged;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0x0F0A0A0A))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: c.border)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 14, height: 1.2, color: ink),
+            style: TextStyle(fontSize: 14, height: 1.2, color: c.ink),
           ),
           Container(
             padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(
-              color: wool,
-              borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+            decoration: BoxDecoration(
+              color: c.wool,
+              borderRadius: const BorderRadius.all(Radius.circular(radiusPill)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -184,7 +194,7 @@ class _SegmentedRow extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: isActive ? ink : Colors.transparent,
+                      color: isActive ? c.ink : Colors.transparent,
                       borderRadius: const BorderRadius.all(
                         Radius.circular(radiusPill),
                       ),
@@ -195,7 +205,7 @@ class _SegmentedRow extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         fontSize: 11,
                         height: 1,
-                        color: isActive ? paper : slate,
+                        color: isActive ? c.paper : c.slate,
                       ),
                     ),
                   ),
@@ -216,6 +226,7 @@ class _ToggleRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
+    required this.c,
     this.subtitle,
   });
 
@@ -223,6 +234,7 @@ class _ToggleRow extends StatelessWidget {
   final String? subtitle;
   final bool value;
   final void Function(bool) onChanged;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -230,8 +242,8 @@ class _ToggleRow extends StatelessWidget {
       onTap: () => onChanged(!value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0x0F0A0A0A))),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: c.border)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -241,26 +253,26 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     height: 1.2,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
                   Text(
                     subtitle!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       height: 1.3,
-                      color: slate,
+                      color: c.slate,
                     ),
                   ),
                 ],
               ],
             ),
-            _Toggle(value: value),
+            _Toggle(value: value, c: c),
           ],
         ),
       ),
@@ -268,12 +280,13 @@ class _ToggleRow extends StatelessWidget {
   }
 }
 
-// ── Toggle widget (44×24 custom) ──────────────────────────────────────────────
+// ── Toggle widget ─────────────────────────────────────────────────────────────
 
 class _Toggle extends StatelessWidget {
-  const _Toggle({required this.value});
+  const _Toggle({required this.value, required this.c});
 
   final bool value;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +295,7 @@ class _Toggle extends StatelessWidget {
       width: 44,
       height: 24,
       decoration: BoxDecoration(
-        color: value ? ink : wool,
+        color: value ? c.ink : c.wool,
         borderRadius: const BorderRadius.all(Radius.circular(radiusPill)),
       ),
       child: Stack(
@@ -295,8 +308,8 @@ class _Toggle extends StatelessWidget {
             child: Container(
               width: 18,
               height: 18,
-              decoration: const BoxDecoration(
-                color: paper,
+              decoration: BoxDecoration(
+                color: c.paper,
                 shape: BoxShape.circle,
               ),
             ),
@@ -310,30 +323,35 @@ class _Toggle extends StatelessWidget {
 // ── Chevron row ───────────────────────────────────────────────────────────────
 
 class _ChevronRow extends StatelessWidget {
-  const _ChevronRow({required this.label, required this.value});
+  const _ChevronRow({
+    required this.label,
+    required this.value,
+    required this.c,
+  });
 
   final String label;
   final String value;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0x0F0A0A0A))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: c.border)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 14, height: 1.2, color: ink),
+            style: TextStyle(fontSize: 14, height: 1.2, color: c.ink),
           ),
           Row(
             children: [
               Text(
                 value,
-                style: const TextStyle(fontSize: 13, height: 1, color: slate),
+                style: TextStyle(fontSize: 13, height: 1, color: c.slate),
               ),
               const SizedBox(width: 4),
               SvgPicture.string(
@@ -342,6 +360,7 @@ class _ChevronRow extends StatelessWidget {
                 '<path d="M5 3l4 4-4 4"/></svg>',
                 width: 14,
                 height: 14,
+                colorFilter: ColorFilter.mode(c.slate, BlendMode.srcIn),
               ),
             ],
           ),
@@ -354,7 +373,9 @@ class _ChevronRow extends StatelessWidget {
 // ── About row ─────────────────────────────────────────────────────────────────
 
 class _AboutRow extends StatelessWidget {
-  const _AboutRow();
+  const _AboutRow({required this.c});
+
+  final SheepColors c;
 
   static const _woolSvg = '''
 <svg width="36" height="40" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">
@@ -379,14 +400,19 @@ class _AboutRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0x0F0A0A0A))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: c.border)),
       ),
       child: Row(
         children: [
-          SvgPicture.string(_woolSvg, width: 36, height: 40),
+          SvgPicture.string(
+            _woolSvg,
+            width: 36,
+            height: 40,
+            colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
+          ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -397,17 +423,17 @@ class _AboutRow extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                     height: 1,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
                   'v0.1.0 · offline-first',
                   style: TextStyle(
                     fontFamily: fontMono,
                     fontSize: 11,
                     height: 1,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
               ],
@@ -415,17 +441,17 @@ class _AboutRow extends StatelessWidget {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: const BoxDecoration(
-              color: wool,
-              borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+            decoration: BoxDecoration(
+              color: c.wool,
+              borderRadius: const BorderRadius.all(Radius.circular(radiusPill)),
             ),
-            child: const Text(
+            child: Text(
               'Source ↗',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 11,
                 height: 1,
-                color: ink,
+                color: c.ink,
               ),
             ),
           ),

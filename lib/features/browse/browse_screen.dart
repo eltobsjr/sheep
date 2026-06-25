@@ -1,10 +1,12 @@
 import 'dart:async' show unawaited;
 
+import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/database_provider.dart';
@@ -19,12 +21,13 @@ class BrowseScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = SheepColors.of(context);
     final selectedId = ref.watch(selectedSourceIdProvider);
     final popularAsync = ref.watch(popularProvider);
     final latestAsync = ref.watch(latestProvider);
 
     return Scaffold(
-      backgroundColor: paper,
+      backgroundColor: c.paper,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -35,14 +38,14 @@ class BrowseScreen extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Browse',
                       style: TextStyle(
                         fontFamily: fontDisplay,
                         fontWeight: FontWeight.w700,
                         fontSize: 28,
                         height: 1.1,
-                        color: ink,
+                        color: c.ink,
                       ),
                     ),
                     GestureDetector(
@@ -50,8 +53,8 @@ class BrowseScreen extends ConsumerWidget {
                       child: Container(
                         width: 36,
                         height: 36,
-                        decoration: const BoxDecoration(
-                          color: wool,
+                        decoration: BoxDecoration(
+                          color: c.wool,
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -63,6 +66,7 @@ class BrowseScreen extends ConsumerWidget {
                           '</svg>',
                           width: 16,
                           height: 16,
+                          colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
                         ),
                       ),
                     ),
@@ -93,7 +97,7 @@ class BrowseScreen extends ConsumerWidget {
                           vertical: 7,
                         ),
                         decoration: BoxDecoration(
-                          color: active ? ink : wool,
+                          color: active ? c.ink : c.wool,
                           borderRadius: const BorderRadius.all(
                             Radius.circular(radiusPill),
                           ),
@@ -105,8 +109,8 @@ class BrowseScreen extends ConsumerWidget {
                               Container(
                                 width: 6,
                                 height: 6,
-                                decoration: const BoxDecoration(
-                                  color: paper,
+                                decoration: BoxDecoration(
+                                  color: c.paper,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -118,7 +122,7 @@ class BrowseScreen extends ConsumerWidget {
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                                 height: 1,
-                                color: active ? paper : slate,
+                                color: active ? c.paper : c.slate,
                               ),
                             ),
                           ],
@@ -148,7 +152,8 @@ class BrowseScreen extends ConsumerWidget {
                       manga: items.first,
                       sourceName: sourceById(items.first.sourceId)?.name ??
                           items.first.sourceId,
-                      onTap: () => unawaited(_onMangaTap(context, ref, items.first)),
+                      onTap: () =>
+                          unawaited(_onMangaTap(context, ref, items.first)),
                     ),
                   );
                 },
@@ -156,16 +161,16 @@ class BrowseScreen extends ConsumerWidget {
             ),
 
             // ── Popular section ───────────────────────────────────────────────
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: Text(
                   'POPULAR THIS WEEK',
                   style: TextStyle(
                     fontSize: 10,
                     height: 1,
                     letterSpacing: 10 * 0.08,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
               ),
@@ -183,7 +188,7 @@ class BrowseScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(20),
                   child: Text(
                     'Erro ao carregar: ${e.toString().split('\n').first}',
-                    style: const TextStyle(fontSize: 13, color: slate),
+                    style: TextStyle(fontSize: 13, color: c.slate),
                   ),
                 ),
               ),
@@ -195,6 +200,7 @@ class BrowseScreen extends ConsumerWidget {
                         items[i].sourceId,
                     showChip: true,
                     onTap: () => unawaited(_onMangaTap(context, ref, items[i])),
+                    c: c,
                   ),
                   childCount: items.length,
                 ),
@@ -202,16 +208,16 @@ class BrowseScreen extends ConsumerWidget {
             ),
 
             // ── Recently updated section ──────────────────────────────────────
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: Text(
                   'RECENTLY UPDATED',
                   style: TextStyle(
                     fontSize: 10,
                     height: 1,
                     letterSpacing: 10 * 0.08,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
               ),
@@ -229,7 +235,9 @@ class BrowseScreen extends ConsumerWidget {
                     sourceName: sourceById(items[i].sourceId)?.name ??
                         items[i].sourceId,
                     showChip: false,
-                    onTap: () => unawaited(_onMangaTap(context, ref, items[i])),
+                    onTap: () =>
+                        unawaited(_onMangaTap(context, ref, items[i])),
+                    c: c,
                   ),
                   childCount: items.length,
                 ),
@@ -272,14 +280,8 @@ class _FeaturedCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static const _colors = [
-    Color(0xFF1A1A2E),
-    Color(0xFF5C3B1E),
-    Color(0xFFCC2B2B),
-    Color(0xFF1B2A4A),
-    Color(0xFF8B1A1A),
-    Color(0xFF2D6A4F),
-    Color(0xFF6B3FA0),
-    Color(0xFF2A3F5A),
+    Color(0xFF1A1A2E), Color(0xFF5C3B1E), Color(0xFFCC2B2B), Color(0xFF1B2A4A),
+    Color(0xFF8B1A1A), Color(0xFF2D6A4F), Color(0xFF6B3FA0), Color(0xFF2A3F5A),
   ];
 
   Color get _color => _colors[manga.id.hashCode.abs() % _colors.length];
@@ -288,122 +290,135 @@ class _FeaturedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 158,
-        decoration: BoxDecoration(
-          color: _color,
-          borderRadius: BorderRadius.circular(radiusCard),
-        ),
-        clipBehavior: Clip.hardEdge,
-        padding: const EdgeInsets.all(14),
-        child: Stack(
-          children: [
-            // Watermark title
-            Positioned(
-              right: -6,
-              bottom: -18,
-              child: Text(
-                manga.title.toUpperCase(),
-                style: const TextStyle(
-                  fontFamily: fontDisplay,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 72,
-                  height: 1,
-                  letterSpacing: 72 * -0.02,
-                  color: Color(0x140A0A0A), // rgba(0,0,0,.08)
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radiusCard),
+        child: SizedBox(
+          height: 158,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background: cover image or colored fallback
+              _RemoteCover(
+                url: manga.coverUrl,
+                fallbackColor: _color,
+                width: double.infinity,
+                height: 158,
+              ),
+              // Dark gradient overlay for text readability
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x55000000), Color(0xDD000000)],
+                  ),
                 ),
               ),
-            ),
-            // Content
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top chips row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 5,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0x38000000),
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(radiusPill)),
-                      ),
-                      child: const Text(
-                        'Ch. ∞',
-                        style: TextStyle(
-                          fontFamily: fontMono,
-                          fontSize: 11,
-                          height: 1,
-                          color: paper,
-                        ),
-                      ),
+              // Watermark title (only when no cover)
+              if (manga.coverUrl.isEmpty)
+                Positioned(
+                  right: -6,
+                  bottom: -18,
+                  child: Text(
+                    manga.title.toUpperCase(),
+                    style: const TextStyle(
+                      fontFamily: fontDisplay,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 72,
+                      height: 1,
+                      letterSpacing: 72 * -0.02,
+                      color: Color(0x140A0A0A),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 5,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0x38000000),
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(radiusPill)),
-                      ),
-                      child: Text(
-                        sourceName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 10,
-                          height: 1,
-                          color: paper,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                // Bottom: title + author
-                Column(
+              // Content overlay
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      manga.title,
-                      style: const TextStyle(
-                        fontFamily: fontDisplay,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 26,
-                        height: 1.1,
-                        color: paper,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (manga.author.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${manga.author} · Ongoing',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 1,
-                          color: Color(0xA6FAFAFA), // rgba(250,250,250,.65)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11, vertical: 5),
+                          decoration: const BoxDecoration(
+                            color: Color(0x38000000),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(radiusPill)),
+                          ),
+                          child: const Text(
+                            'Ch. ∞',
+                            style: TextStyle(
+                              fontFamily: fontMono,
+                              fontSize: 11,
+                              height: 1,
+                              color: Color(0xFFFAFAFA),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11, vertical: 5),
+                          decoration: const BoxDecoration(
+                            color: Color(0x38000000),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(radiusPill)),
+                          ),
+                          child: Text(
+                            sourceName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                              height: 1,
+                              color: Color(0xFFFAFAFA),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          manga.title,
+                          style: const TextStyle(
+                            fontFamily: fontDisplay,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 26,
+                            height: 1.1,
+                            color: Color(0xFFFAFAFA),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (manga.author.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${manga.author} · Ongoing',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1,
+                              color: Color(0xA6FAFAFA),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Manga list item (Popular / Recently updated) ───────────────────────────────
+// ── Manga list item ───────────────────────────────────────────────────────────
 
 class _MangaListItem extends StatelessWidget {
   const _MangaListItem({
@@ -411,12 +426,14 @@ class _MangaListItem extends StatelessWidget {
     required this.sourceName,
     required this.showChip,
     required this.onTap,
+    required this.c,
   });
 
   final MangaSummary manga;
   final String sourceName;
   final bool showChip;
   final VoidCallback onTap;
+  final SheepColors c;
 
   static const _colors = [
     Color(0xFF1A1A2E),
@@ -437,35 +454,34 @@ class _MangaListItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Color(0x0F0A0A0A)),
+            bottom: BorderSide(color: c.border),
           ),
         ),
         child: Row(
           children: [
-            // Cover placeholder: 46×62
-            Container(
-              width: 46,
-              height: 62,
-              decoration: BoxDecoration(
-                color: _color,
-                borderRadius: BorderRadius.circular(8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _RemoteCover(
+                url: manga.coverUrl,
+                fallbackColor: _color,
+                width: 46,
+                height: 62,
               ),
             ),
             const SizedBox(width: 12),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     manga.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       height: 1.2,
-                      color: ink,
+                      color: c.ink,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -473,10 +489,10 @@ class _MangaListItem extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     manga.author.isNotEmpty ? manga.author : sourceName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       height: 1.3,
-                      color: slate,
+                      color: c.slate,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -489,17 +505,18 @@ class _MangaListItem extends StatelessWidget {
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: const BoxDecoration(
-                  color: wool,
-                  borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+                decoration: BoxDecoration(
+                  color: c.wool,
+                  borderRadius:
+                      const BorderRadius.all(Radius.circular(radiusPill)),
                 ),
-                child: const Text(
+                child: Text(
                   'NEW',
                   style: TextStyle(
                     fontFamily: fontMono,
                     fontSize: 10,
                     height: 1,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
               ),
@@ -507,6 +524,49 @@ class _MangaListItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Remote cover image with fallback ─────────────────────────────────────────
+
+class _RemoteCover extends StatelessWidget {
+  const _RemoteCover({
+    required this.url,
+    required this.fallbackColor,
+    required this.width,
+    required this.height,
+  });
+
+  final String url;
+  final Color fallbackColor;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.isEmpty) {
+      return SizedBox(
+        width: width,
+        height: height,
+        child: ColoredBox(color: fallbackColor),
+      );
+    }
+    return ExtendedImage.network(
+      url,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      loadStateChanged: (state) {
+        if (state.extendedImageLoadState != LoadState.completed) {
+          return SizedBox(
+            width: width,
+            height: height,
+            child: ColoredBox(color: fallbackColor),
+          );
+        }
+        return null;
+      },
     );
   }
 }

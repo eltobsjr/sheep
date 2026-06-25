@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'sheep_colors.dart';
 import 'tokens.dart';
 
 // ─────────────────────────────── dark tokens ─────────────────────────────────
@@ -12,6 +13,7 @@ const Color _darkWool = Color(0xFF2A2A2A);
 
 final ThemeData darkTheme = ThemeData(
   useMaterial3: true,
+  extensions: const [SheepColors.dark],
   scaffoldBackgroundColor: _darkBg,
   shadowColor: Colors.transparent,
   splashColor: Colors.transparent,
@@ -78,6 +80,7 @@ final ThemeData darkTheme = ThemeData(
 
 final ThemeData appTheme = ThemeData(
   useMaterial3: true,
+  extensions: const [SheepColors.light],
   scaffoldBackgroundColor: paper,
   shadowColor: Colors.transparent,
   splashColor: Colors.transparent,

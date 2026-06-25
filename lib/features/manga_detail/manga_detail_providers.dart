@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../data/db/app_database.dart';
 import '../../data/db/database_provider.dart';
@@ -19,8 +23,8 @@ final chaptersWatchProvider =
   return ref.watch(databaseProvider).watchChapters(mangaId);
 });
 
-// Fetches manga detail + chapters from source, saves to DB, then returns.
-// Re-runs whenever the provider is refreshed.
+// Fetches manga detail + chapters from source, saves to DB.
+// Called from the screen via ref.watch — triggers on first build.
 final fetchMangaDetailProvider =
     FutureProvider.autoDispose.family<void, String>((ref, mangaId) async {
   final db = ref.read(databaseProvider);
@@ -33,12 +37,43 @@ final fetchMangaDetailProvider =
   final details = await source.getDetails(manga.url!);
   final chapterSummaries = await source.getChapters(manga.url!);
 
+  // Download cover if not already saved
+  String coverPath = manga.coverPath;
+  if (details.coverUrl.isNotEmpty && coverPath.isEmpty) {
+    try {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final coverDir = Directory(p.join(appDocDir.path, 'manga', mangaId));
+      await coverDir.create(recursive: true);
+      final coverFile = File(p.join(coverDir.path, 'cover.jpg'));
+      if (!coverFile.existsSync()) {
+        final dio = Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {
+            'User-Agent': 'SheepReader/1.0 (Android)',
+            'Referer': source.baseUrl,
+          },
+        ));
+        final response = await dio.get<List<int>>(
+          details.coverUrl,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        if (response.data != null && response.data!.isNotEmpty) {
+          await coverFile.writeAsBytes(response.data!);
+        }
+      }
+      if (coverFile.existsSync()) coverPath = coverFile.path;
+    } catch (_) {
+      // Non-fatal — continue without cover
+    }
+  }
+
   await db.upsertManga(
     MangasCompanion(
       id: Value(manga.id),
       sourceId: Value(manga.sourceId),
       title: Value(details.title),
-      coverPath: Value(manga.coverPath),
+      coverPath: Value(coverPath),
       status: Value(details.status.name),
       url: Value(manga.url),
       synopsis: Value(details.synopsis),

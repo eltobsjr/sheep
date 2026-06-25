@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/app_database.dart';
@@ -18,17 +19,18 @@ class LibraryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = SheepColors.of(context);
     final mangasAsync = ref.watch(libraryMangasProvider);
     final lastReadAsync = ref.watch(lastReadProvider);
 
     return Scaffold(
-      backgroundColor: paper,
+      backgroundColor: c.paper,
       body: SafeArea(
         child: mangasAsync.when(
           loading: () => const Center(child: WoolLoading()),
-          error: (e, _) => const _LibraryHeader(showSearch: false),
+          error: (e, _) => _LibraryHeader(showSearch: false, c: c),
           data: (mangas) => mangas.isEmpty
-              ? _EmptyState(onBrowse: () => context.go('/browse'))
+              ? _EmptyState(onBrowse: () => context.go('/browse'), c: c)
               : _FilledState(
                   mangas: mangas,
                   lastRead: lastReadAsync.valueOrNull,
@@ -36,6 +38,7 @@ class LibraryScreen extends ConsumerWidget {
                   onReadTap: (mangaId, chapterId) =>
                       context.go('/reader/$mangaId/$chapterId'),
                   onSearchTap: () => context.go('/browse/search'),
+                  c: c,
                 ),
         ),
       ),
@@ -43,21 +46,21 @@ class LibraryScreen extends ConsumerWidget {
   }
 }
 
-// ── Empty state (Frame 8) ─────────────────────────────────────────────────────
+// ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onBrowse});
+  const _EmptyState({required this.onBrowse, required this.c});
 
   final VoidCallback onBrowse;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header — no search button in empty state
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
           child: Text(
             'Library',
             style: TextStyle(
@@ -65,11 +68,10 @@ class _EmptyState extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 28,
               height: 1.1,
-              color: ink,
+              color: c.ink,
             ),
           ),
         ),
-        // Centered content
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -80,10 +82,10 @@ class _EmptyState extends StatelessWidget {
                   'assets/svg/wool_mascot.svg',
                   width: 88,
                   height: 100,
-                  colorFilter: const ColorFilter.mode(ink, BlendMode.srcIn),
+                  colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Your library is empty',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -91,17 +93,17 @@ class _EmptyState extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 22,
                     height: 1.2,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Browse sources to find manga and add your first series',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.6,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -112,18 +114,19 @@ class _EmptyState extends StatelessWidget {
                       horizontal: 28,
                       vertical: 13,
                     ),
-                    decoration: const BoxDecoration(
-                      color: ink,
-                      borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+                    decoration: BoxDecoration(
+                      color: c.ink,
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(radiusPill)),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Browse manga',
                       style: TextStyle(
                         fontFamily: fontDisplay,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                         height: 1,
-                        color: paper,
+                        color: c.paper,
                       ),
                     ),
                   ),
@@ -137,7 +140,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Filled state (Frame 1) ────────────────────────────────────────────────────
+// ── Filled state ──────────────────────────────────────────────────────────────
 
 class _FilledState extends StatelessWidget {
   const _FilledState({
@@ -146,6 +149,7 @@ class _FilledState extends StatelessWidget {
     required this.onMangaTap,
     required this.onReadTap,
     required this.onSearchTap,
+    required this.c,
   });
 
   final List<Manga> mangas;
@@ -153,6 +157,7 @@ class _FilledState extends StatelessWidget {
   final void Function(String mangaId) onMangaTap;
   final void Function(String mangaId, String chapterId) onReadTap;
   final VoidCallback onSearchTap;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -166,14 +171,14 @@ class _FilledState extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Library',
                   style: TextStyle(
                     fontFamily: fontDisplay,
                     fontWeight: FontWeight.w700,
                     fontSize: 28,
                     height: 1.1,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
                 GestureDetector(
@@ -181,8 +186,8 @@ class _FilledState extends StatelessWidget {
                   child: Container(
                     width: 36,
                     height: 36,
-                    decoration: const BoxDecoration(
-                      color: wool,
+                    decoration: BoxDecoration(
+                      color: c.wool,
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -194,6 +199,7 @@ class _FilledState extends StatelessWidget {
                       '</svg>',
                       width: 16,
                       height: 16,
+                      colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
                     ),
                   ),
                 ),
@@ -208,19 +214,21 @@ class _FilledState extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'CONTINUE READING',
                     style: TextStyle(
                       fontSize: 10,
                       height: 1,
                       letterSpacing: 10 * 0.08,
-                      color: slate,
+                      color: c.slate,
                     ),
                   ),
                   const SizedBox(height: 10),
                   _ContinueReadingCard(
                     entry: lastRead!,
-                    onRead: () => onReadTap(lastRead!.mangaId, lastRead!.chapterId),
+                    onRead: () =>
+                        onReadTap(lastRead!.mangaId, lastRead!.chapterId),
+                    c: c,
                   ),
                 ],
               ),
@@ -235,11 +243,11 @@ class _FilledState extends StatelessWidget {
               children: [
                 Text(
                   'ALL · ${mangas.length}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     height: 1,
                     letterSpacing: 10 * 0.08,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
                 SvgPicture.string(
@@ -251,6 +259,7 @@ class _FilledState extends StatelessWidget {
                   '</svg>',
                   width: 14,
                   height: 14,
+                  colorFilter: ColorFilter.mode(c.slate, BlendMode.srcIn),
                 ),
               ],
             ),
@@ -263,7 +272,7 @@ class _FilledState extends StatelessWidget {
               builder: (context, constraints) {
                 const crossAxisCount = 2;
                 const crossAxisSpacing = 12.0;
-                const belowCoverHeight = 33.0; // 7 gap + ~14.4 title + 2 gap + ~10 source
+                const belowCoverHeight = 33.0;
                 final cellWidth =
                     (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
                     crossAxisCount;
@@ -282,7 +291,7 @@ class _FilledState extends StatelessWidget {
                   itemCount: mangas.length,
                   itemBuilder: (context, i) => GestureDetector(
                     onTap: () => onMangaTap(mangas[i].id),
-                    child: _MangaCard(manga: mangas[i]),
+                    child: _MangaCard(manga: mangas[i], c: c),
                   ),
                 );
               },
@@ -297,16 +306,21 @@ class _FilledState extends StatelessWidget {
 // ── Continue Reading card ─────────────────────────────────────────────────────
 
 class _ContinueReadingCard extends StatelessWidget {
-  const _ContinueReadingCard({required this.entry, required this.onRead});
+  const _ContinueReadingCard({
+    required this.entry,
+    required this.onRead,
+    required this.c,
+  });
 
   final LastReadEntry entry;
   final VoidCallback onRead;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: wool,
+        color: c.wool,
         borderRadius: BorderRadius.circular(radiusCard),
       ),
       padding: const EdgeInsets.all(14),
@@ -317,7 +331,7 @@ class _ContinueReadingCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: _CoverThumbnail(
-              coverPath: '',
+              coverPath: entry.coverPath,
               mangaId: entry.mangaId,
               title: entry.mangaTitle,
               width: 50,
@@ -333,42 +347,41 @@ class _ContinueReadingCard extends StatelessWidget {
               children: [
                 Text(
                   entry.mangaTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
                     height: 1.2,
-                    color: ink,
+                    color: c.ink,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${entry.chapterTitle} · Page ${entry.lastPage}'
                   '${entry.pageCount != null ? ' of ${entry.pageCount}' : ''}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.4,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Progress bar: 2px height
                 ClipRRect(
                   borderRadius: BorderRadius.circular(1),
                   child: LinearProgressIndicator(
                     value: entry.progress,
-                    backgroundColor: const Color(0x1F0A0A0A),
-                    valueColor: const AlwaysStoppedAnimation<Color>(ink),
+                    backgroundColor: Color.lerp(c.ink, Colors.transparent, 0.88),
+                    valueColor: AlwaysStoppedAnimation<Color>(c.ink),
                     minHeight: 2,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   '${entry.progressPercent}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: fontMono,
                     fontSize: 10,
                     height: 1,
-                    color: slate,
+                    color: c.slate,
                   ),
                 ),
               ],
@@ -376,26 +389,30 @@ class _ContinueReadingCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
 
-          // "Read" button — centered against the 70px cover height
+          // "Read" button
           SizedBox(
             height: 70,
             child: Center(
               child: GestureDetector(
                 onTap: onRead,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: const BoxDecoration(
-                    color: ink,
-                    borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                  child: const Text(
+                  decoration: BoxDecoration(
+                    color: c.ink,
+                    borderRadius:
+                        const BorderRadius.all(Radius.circular(radiusPill)),
+                  ),
+                  child: Text(
                     'Read',
                     style: TextStyle(
                       fontFamily: fontDisplay,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                       height: 1,
-                      color: paper,
+                      color: c.paper,
                     ),
                   ),
                 ),
@@ -411,9 +428,10 @@ class _ContinueReadingCard extends StatelessWidget {
 // ── Grid card ─────────────────────────────────────────────────────────────────
 
 class _MangaCard extends StatelessWidget {
-  const _MangaCard({required this.manga});
+  const _MangaCard({required this.manga, required this.c});
 
   final Manga manga;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +439,6 @@ class _MangaCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Cover with 3:4 aspect ratio
         Expanded(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
@@ -437,11 +454,11 @@ class _MangaCard extends StatelessWidget {
         const SizedBox(height: 7),
         Text(
           manga.title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12,
             height: 1.2,
-            color: ink,
+            color: c.ink,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -449,10 +466,10 @@ class _MangaCard extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           sourceName,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             height: 1,
-            color: slate,
+            color: c.slate,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -462,7 +479,7 @@ class _MangaCard extends StatelessWidget {
   }
 }
 
-// ── Cover thumbnail (local file or colored placeholder) ───────────────────────
+// ── Cover thumbnail ───────────────────────────────────────────────────────────
 
 class _CoverThumbnail extends StatelessWidget {
   const _CoverThumbnail({
@@ -527,7 +544,7 @@ class _Placeholder extends StatelessWidget {
           fontFamily: fontMono,
           fontSize: 8,
           height: 1.3,
-          color: Color(0x66FAFAFA), // rgba(250,250,250,.4)
+          color: Color(0x66FAFAFA),
           letterSpacing: 8 * 0.04,
         ),
         maxLines: 2,
@@ -537,12 +554,13 @@ class _Placeholder extends StatelessWidget {
   }
 }
 
-// ── Shared header widget (used during loading) ────────────────────────────────
+// ── Shared header ─────────────────────────────────────────────────────────────
 
 class _LibraryHeader extends StatelessWidget {
-  const _LibraryHeader({required this.showSearch});
+  const _LibraryHeader({required this.showSearch, required this.c});
 
   final bool showSearch;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
@@ -551,21 +569,21 @@ class _LibraryHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             'Library',
             style: TextStyle(
               fontFamily: fontDisplay,
               fontWeight: FontWeight.w700,
               fontSize: 28,
               height: 1.1,
-              color: ink,
+              color: c.ink,
             ),
           ),
           if (showSearch)
             Container(
               width: 36,
               height: 36,
-              decoration: const BoxDecoration(color: wool, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: c.wool, shape: BoxShape.circle),
             ),
         ],
       ),

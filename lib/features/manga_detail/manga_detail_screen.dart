@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/app_database.dart';
@@ -28,11 +29,14 @@ class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = SheepColors.of(context);
     final mangaAsync = ref.watch(mangaWatchProvider(widget.mangaId));
     final chaptersAsync = ref.watch(chaptersWatchProvider(widget.mangaId));
+    // Trigger fetch from source — loads chapters and cover on first open
+    final fetchAsync = ref.watch(fetchMangaDetailProvider(widget.mangaId));
 
     return Scaffold(
-      backgroundColor: paper,
+      backgroundColor: c.paper,
       body: mangaAsync.when(
         loading: () => const Center(child: WoolLoading()),
         error: (_, _) => const Center(child: Text('Erro ao carregar')),
@@ -40,6 +44,7 @@ class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
           mangaId: widget.mangaId,
           manga: manga,
           chaptersAsync: chaptersAsync,
+          fetchAsync: fetchAsync,
           synopsisExpanded: _synopsisExpanded,
           onToggleSynopsis: () =>
               setState(() => _synopsisExpanded = !_synopsisExpanded),
@@ -56,6 +61,7 @@ class _DetailBody extends ConsumerWidget {
     required this.mangaId,
     required this.manga,
     required this.chaptersAsync,
+    required this.fetchAsync,
     required this.synopsisExpanded,
     required this.onToggleSynopsis,
   });
@@ -63,6 +69,7 @@ class _DetailBody extends ConsumerWidget {
   final String mangaId;
   final Manga? manga;
   final AsyncValue<List<Chapter>> chaptersAsync;
+  final AsyncValue<void> fetchAsync;
   final bool synopsisExpanded;
   final VoidCallback onToggleSynopsis;
 
@@ -91,6 +98,7 @@ class _DetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = SheepColors.of(context);
     final heroColor = _heroColor(mangaId);
     final title = manga?.title ?? '';
     final author = manga?.author ?? '';
@@ -99,86 +107,110 @@ class _DetailBody extends ConsumerWidget {
     final genreList = _genres(manga?.genres);
     final inLibrary = manga?.inLibrary ?? false;
     final toggle = ref.read(toggleLibraryProvider(mangaId));
+    final coverPath = manga?.coverPath ?? '';
 
     final chapters = chaptersAsync.valueOrNull ?? const [];
-    // Chapters are ordered latest first; first to read is the one with min number.
     final firstChapter = chapters.isNotEmpty
         ? chapters.reduce((a, b) => a.number < b.number ? a : b)
         : null;
 
     final topPad = MediaQuery.of(context).padding.top;
+    final isLoading = fetchAsync.isLoading && chapters.isEmpty;
+    final hasError = fetchAsync.hasError && chapters.isEmpty;
 
     return Column(
       children: [
         // ── Dark hero section ────────────────────────────────────────────────
-        ColoredBox(
-          color: heroColor,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: topPad),
-              // Back nav row — 50px
-              SizedBox(
-                height: 50,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => context.pop(),
-                        child: SvgPicture.string(
-                          '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"'
-                          ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
-                          ' stroke-linejoin="round"><path d="M12 4L5 10l7 6"/></svg>',
-                          width: 20,
-                          height: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Library',
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1,
-                          color: Color(0x99FAFAFA), // rgba(250,250,250,.6)
-                        ),
-                      ),
-                    ],
+        Stack(
+          children: [
+            // Cover image or colored background
+            _HeroCover(
+              coverPath: coverPath,
+              heroColor: heroColor,
+            ),
+            // Gradient overlay for text readability
+            if (coverPath.isNotEmpty)
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x99000000),
+                        Color(0xCC000000),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              // Title + author
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontFamily: fontDisplay,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 32,
-                        height: 1.1,
-                        color: paper,
-                      ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: topPad),
+                // Back nav row
+                SizedBox(
+                  height: 50,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.pop(),
+                          child: SvgPicture.string(
+                            '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"'
+                            ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
+                            ' stroke-linejoin="round"><path d="M12 4L5 10l7 6"/></svg>',
+                            width: 20,
+                            height: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Voltar',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1,
+                            color: Color(0x99FAFAFA),
+                          ),
+                        ),
+                      ],
                     ),
-                    if (author.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                  ),
+                ),
+                // Title + author
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        author,
+                        title,
                         style: const TextStyle(
-                          fontSize: 13,
-                          height: 1,
-                          color: Color(0x8CFAFAFA), // rgba(250,250,250,.55)
+                          fontFamily: fontDisplay,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 32,
+                          height: 1.1,
+                          color: Color(0xFFFAFAFA),
                         ),
                       ),
+                      if (author.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          author,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1,
+                            color: Color(0x8CFAFAFA),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
 
         // ── Scrollable content ───────────────────────────────────────────────
@@ -197,32 +229,35 @@ class _DetailBody extends ConsumerWidget {
                       if (statusRaw.isNotEmpty)
                         _Chip(
                           text: _statusLabel(statusRaw),
-                          textStyle: const TextStyle(
+                          textStyle: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 11,
                             height: 1,
-                            color: ink,
+                            color: c.ink,
                           ),
+                          bgColor: c.wool,
                         ),
                       if (chapters.isNotEmpty)
                         _Chip(
                           text: '${chapters.length} ch',
-                          textStyle: const TextStyle(
+                          textStyle: TextStyle(
                             fontFamily: fontMono,
                             fontWeight: FontWeight.w400,
                             fontSize: 11,
                             height: 1,
-                            color: slate,
+                            color: c.slate,
                           ),
+                          bgColor: c.wool,
                         ),
                       for (final g in genreList.take(2))
                         _Chip(
                           text: g,
-                          textStyle: const TextStyle(
+                          textStyle: TextStyle(
                             fontSize: 11,
                             height: 1,
-                            color: slate,
+                            color: c.slate,
                           ),
+                          bgColor: c.wool,
                         ),
                     ],
                   ),
@@ -239,10 +274,10 @@ class _DetailBody extends ConsumerWidget {
                           synopsisExpanded
                               ? synopsis
                               : _truncate(synopsis, 160),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             height: 1.65,
-                            color: ink,
+                            color: c.ink,
                           ),
                         ),
                         if (synopsis.length > 160) ...[
@@ -254,19 +289,19 @@ class _DetailBody extends ConsumerWidget {
                                 horizontal: 12,
                                 vertical: 5,
                               ),
-                              decoration: const BoxDecoration(
-                                color: wool,
-                                borderRadius: BorderRadius.all(
+                              decoration: BoxDecoration(
+                                color: c.wool,
+                                borderRadius: const BorderRadius.all(
                                   Radius.circular(radiusPill),
                                 ),
                               ),
                               child: Text(
                                 synopsisExpanded ? 'Less' : 'More',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 11,
                                   height: 1,
-                                  color: ink,
+                                  color: c.ink,
                                 ),
                               ),
                             ),
@@ -281,9 +316,9 @@ class _DetailBody extends ConsumerWidget {
                 Container(
                   margin: const EdgeInsets.only(top: 14),
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(
-                      top: BorderSide(color: Color(0x0F0A0A0A)),
+                      top: BorderSide(color: c.border),
                     ),
                   ),
                   child: Row(
@@ -296,15 +331,13 @@ class _DetailBody extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               border: Border.all(
-                                color: inLibrary
-                                    ? ink
-                                    : const Color(0x260A0A0A),
+                                color: inLibrary ? c.ink : c.border,
                                 width: 1.5,
                               ),
                               borderRadius: const BorderRadius.all(
                                 Radius.circular(radiusPill),
                               ),
-                              color: inLibrary ? ink : Colors.transparent,
+                              color: inLibrary ? c.ink : Colors.transparent,
                             ),
                             alignment: Alignment.center,
                             child: Text(
@@ -314,7 +347,7 @@ class _DetailBody extends ConsumerWidget {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
                                 height: 1,
-                                color: inLibrary ? paper : ink,
+                                color: inLibrary ? c.paper : c.ink,
                               ),
                             ),
                           ),
@@ -331,9 +364,9 @@ class _DetailBody extends ConsumerWidget {
                                   ),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: const BoxDecoration(
-                              color: ink,
-                              borderRadius: BorderRadius.all(
+                            decoration: BoxDecoration(
+                              color: c.ink,
+                              borderRadius: const BorderRadius.all(
                                 Radius.circular(radiusPill),
                               ),
                             ),
@@ -342,12 +375,12 @@ class _DetailBody extends ConsumerWidget {
                               firstChapter != null
                                   ? '▶ Read Ch. ${_fmtNum(firstChapter.number)}'
                                   : '▶ Read',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: fontDisplay,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
                                 height: 1,
-                                color: paper,
+                                color: c.paper,
                               ),
                             ),
                           ),
@@ -360,9 +393,9 @@ class _DetailBody extends ConsumerWidget {
                 // ── Chapters header ──────────────────────────────────────────
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(
-                      top: BorderSide(color: Color(0x0F0A0A0A)),
+                      top: BorderSide(color: c.border),
                     ),
                   ),
                   child: Row(
@@ -372,21 +405,21 @@ class _DetailBody extends ConsumerWidget {
                         chapters.isEmpty
                             ? 'CHAPTERS'
                             : 'CHAPTERS · ${chapters.length}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           height: 1,
                           letterSpacing: 10 * 0.08,
-                          color: slate,
+                          color: c.slate,
                         ),
                       ),
                       Row(
                         children: [
-                          const Text(
+                          Text(
                             'Latest first',
                             style: TextStyle(
                               fontSize: 11,
                               height: 1,
-                              color: slate,
+                              color: c.slate,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -403,21 +436,38 @@ class _DetailBody extends ConsumerWidget {
                   ),
                 ),
 
-                // ── Chapter list ─────────────────────────────────────────────
-                if (chaptersAsync.isLoading && chapters.isEmpty)
+                // ── Chapter list or loading/error ─────────────────────────────
+                if (isLoading)
                   const Padding(
                     padding: EdgeInsets.all(32),
                     child: Center(child: WoolLoading(size: 60)),
                   )
+                else if (hasError)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'Erro ao buscar capítulos.\nVerifique sua conexão.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          color: c.slate,
+                        ),
+                      ),
+                    ),
+                  )
                 else
                   ...chapters.map((ch) => _ChapterRow(
-                    chapter: ch,
-                    onDownload: ch.isDownloaded
-                        ? null
-                        : () => ref
-                            .read(downloadServiceProvider)
-                            .queue(ch.id),
-                  )),
+                        chapter: ch,
+                        onTap: () =>
+                            context.push('/reader/$mangaId/${ch.id}'),
+                        onDownload: ch.isDownloaded
+                            ? null
+                            : () => ref
+                                .read(downloadServiceProvider)
+                                .queue(ch.id),
+                      )),
 
                 const SizedBox(height: 20),
               ],
@@ -443,21 +493,60 @@ class _DetailBody extends ConsumerWidget {
       n == n.truncateToDouble() ? n.toInt().toString() : n.toString();
 }
 
+// ── Hero cover ────────────────────────────────────────────────────────────────
+
+class _HeroCover extends StatelessWidget {
+  const _HeroCover({required this.coverPath, required this.heroColor});
+
+  final String coverPath;
+  final Color heroColor;
+
+  @override
+  Widget build(BuildContext context) {
+    if (coverPath.isNotEmpty) {
+      final file = File(coverPath);
+      if (file.existsSync()) {
+        return SizedBox(
+          width: double.infinity,
+          height: 220,
+          child: Image.file(
+            file,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => ColoredBox(
+              color: heroColor,
+              child: const SizedBox(height: 220),
+            ),
+          ),
+        );
+      }
+    }
+    return ColoredBox(
+      color: heroColor,
+      child: const SizedBox(width: double.infinity, height: 220),
+    );
+  }
+}
+
 // ── Chip ─────────────────────────────────────────────────────────────────────
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.text, required this.textStyle});
+  const _Chip({
+    required this.text,
+    required this.textStyle,
+    required this.bgColor,
+  });
 
   final String text;
   final TextStyle textStyle;
+  final Color bgColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: const BoxDecoration(
-        color: wool,
-        borderRadius: BorderRadius.all(Radius.circular(radiusPill)),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.all(Radius.circular(radiusPill)),
       ),
       child: Text(text, style: textStyle),
     );
@@ -467,78 +556,89 @@ class _Chip extends StatelessWidget {
 // ── Chapter row ───────────────────────────────────────────────────────────────
 
 class _ChapterRow extends StatelessWidget {
-  const _ChapterRow({required this.chapter, this.onDownload});
+  const _ChapterRow({
+    required this.chapter,
+    required this.onTap,
+    this.onDownload,
+  });
 
   final Chapter chapter;
+  final VoidCallback onTap;
   final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
+    final c = SheepColors.of(context);
     final numStr = chapter.number == chapter.number.truncateToDouble()
         ? chapter.number.toInt().toString()
         : chapter.number.toString();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0x0D0A0A0A)),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          border: Border(
+            bottom: BorderSide(color: c.border),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          // Chapter number
-          SizedBox(
-            width: 26,
-            child: Text(
-              numStr,
-              style: const TextStyle(
-                fontFamily: fontMono,
-                fontWeight: FontWeight.w400,
-                fontSize: 12,
-                height: 1,
-                color: slate,
+        child: Row(
+          children: [
+            // Chapter number
+            SizedBox(
+              width: 26,
+              child: Text(
+                numStr,
+                style: TextStyle(
+                  fontFamily: fontMono,
+                  fontWeight: FontWeight.w400,
+                  fontSize: 12,
+                  height: 1,
+                  color: c.slate,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Title + date
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  chapter.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                    height: 1.2,
-                    color: ink,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (chapter.uploadedAt != null) ...[
-                  const SizedBox(height: 3),
+            const SizedBox(width: 12),
+            // Title + date
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    _relativeTime(chapter.uploadedAt!),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      height: 1,
-                      color: slate,
+                    chapter.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      height: 1.2,
+                      color: c.ink,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (chapter.uploadedAt != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      _relativeTime(chapter.uploadedAt!),
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1,
+                        color: c.slate,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Action button
-          GestureDetector(
-            onTap: onDownload,
-            child: _ChapterActionButton(chapter: chapter),
-          ),
-        ],
+            const SizedBox(width: 12),
+            // Download / checkmark button
+            GestureDetector(
+              onTap: onDownload,
+              behavior: HitTestBehavior.opaque,
+              child: _ChapterActionButton(chapter: chapter, c: c),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -554,26 +654,25 @@ class _ChapterRow extends StatelessWidget {
   }
 }
 
-// ── Chapter action button (read ✓ or download ↓) ─────────────────────────────
+// ── Chapter action button ─────────────────────────────────────────────────────
 
 class _ChapterActionButton extends StatelessWidget {
-  const _ChapterActionButton({required this.chapter});
+  const _ChapterActionButton({required this.chapter, required this.c});
 
   final Chapter chapter;
+  final SheepColors c;
 
   @override
   Widget build(BuildContext context) {
-    final isRead = chapter.isDownloaded;
-
     return Container(
       width: 28,
       height: 28,
       decoration: BoxDecoration(
-        color: isRead ? ink : wool,
+        color: chapter.isDownloaded ? c.ink : c.wool,
         borderRadius: BorderRadius.circular(7),
       ),
       alignment: Alignment.center,
-      child: isRead
+      child: chapter.isDownloaded
           ? SvgPicture.string(
               '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"'
               ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
@@ -593,37 +692,5 @@ class _ChapterActionButton extends StatelessWidget {
               height: 14,
             ),
     );
-  }
-}
-
-// ── Cover thumbnail (local file or colored placeholder) ───────────────────────
-
-// ignore: unused_element
-class _CoverThumbnail extends StatelessWidget {
-  const _CoverThumbnail({
-    required this.coverPath,
-    required this.color,
-    required this.width,
-    required this.height,
-  });
-
-  final String coverPath;
-  final Color color;
-  final double width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final file = coverPath.isNotEmpty ? File(coverPath) : null;
-    if (file != null && file.existsSync()) {
-      return Image.file(
-        file,
-        width: width,
-        height: height,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => ColoredBox(color: color),
-      );
-    }
-    return ColoredBox(color: color);
   }
 }

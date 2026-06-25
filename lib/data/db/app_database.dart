@@ -46,6 +46,7 @@ class LastReadEntry {
   const LastReadEntry({
     required this.mangaId,
     required this.mangaTitle,
+    required this.coverPath,
     required this.chapterId,
     required this.chapterTitle,
     required this.chapterNumber,
@@ -55,6 +56,7 @@ class LastReadEntry {
 
   final String mangaId;
   final String mangaTitle;
+  final String coverPath;
   final String chapterId;
   final String chapterTitle;
   final double chapterNumber;
@@ -287,6 +289,7 @@ class AppDatabase extends _$AppDatabase {
       return LastReadEntry(
         mangaId: m.id,
         mangaTitle: m.title,
+        coverPath: m.coverPath,
         chapterId: ch.id,
         chapterTitle: ch.title,
         chapterNumber: ch.number,
