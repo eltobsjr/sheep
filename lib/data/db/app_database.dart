@@ -39,19 +39,53 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator m) => m.createAll(),
     onUpgrade: (Migrator m, int from, int to) async {
       if (from < 2) await m.createTable(sourceCredentials);
+      if (from < 3) {
+        await m.addColumn(mangas, mangas.url);
+        await m.addColumn(mangas, mangas.synopsis);
+        await m.addColumn(mangas, mangas.author);
+        await m.addColumn(mangas, mangas.genres);
+        await m.addColumn(chapters, chapters.uploadedAt);
+      }
     },
   );
 
   // Watches all mangas that the user added to their library.
   Stream<List<Manga>> watchLibraryMangas() =>
       (select(mangas)..where((m) => m.inLibrary.equals(true))).watch();
+
+  // Watches a single manga by its ID.
+  Stream<Manga?> watchManga(String mangaId) =>
+      (select(mangas)..where((m) => m.id.equals(mangaId)))
+          .watchSingleOrNull();
+
+  // Watches all chapters for a manga, ordered latest first.
+  Stream<List<Chapter>> watchChapters(String mangaId) =>
+      (select(chapters)
+            ..where((c) => c.mangaId.equals(mangaId))
+            ..orderBy([(c) => OrderingTerm.desc(c.number)]))
+          .watch();
+
+  // Adds or removes a manga from the library.
+  Future<void> toggleLibrary(String mangaId, {required bool inLibrary}) =>
+      (update(mangas)..where((m) => m.id.equals(mangaId)))
+          .write(MangasCompanion(inLibrary: Value(inLibrary)));
+
+  // Inserts or updates a manga (e.g. after fetching details from source).
+  Future<void> upsertManga(MangasCompanion row) =>
+      into(mangas).insertOnConflictUpdate(row);
+
+  // Bulk inserts/updates chapters (e.g. after fetching chapter list from source).
+  Future<void> upsertChapters(List<ChaptersCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(chapters, rows));
+  }
 
   // Watches the single most recently read chapter (for "Continue Reading").
   Stream<LastReadEntry?> watchLastRead() {

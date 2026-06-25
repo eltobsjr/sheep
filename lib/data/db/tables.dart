@@ -8,6 +8,10 @@ class Mangas extends Table {
   TextColumn get status => text()();
   BoolColumn get inLibrary =>
       boolean().withDefault(const Constant(false))();
+  TextColumn get url => text().nullable()();
+  TextColumn get synopsis => text().nullable()();
+  TextColumn get author => text().nullable()();
+  TextColumn get genres => text().nullable()(); // JSON-encoded List<String>
 
   @override
   // ignore: strict_raw_types
@@ -24,6 +28,7 @@ class Chapters extends Table {
       boolean().withDefault(const Constant(false))();
   TextColumn get localPath => text().nullable()();
   IntColumn get pageCount => integer().nullable()();
+  DateTimeColumn get uploadedAt => dateTime().nullable()();
 
   @override
   // ignore: strict_raw_types

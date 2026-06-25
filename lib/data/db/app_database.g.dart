@@ -72,6 +72,44 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _synopsisMeta = const VerificationMeta(
+    'synopsis',
+  );
+  @override
+  late final GeneratedColumn<String> synopsis = GeneratedColumn<String>(
+    'synopsis',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+    'author',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _genresMeta = const VerificationMeta('genres');
+  @override
+  late final GeneratedColumn<String> genres = GeneratedColumn<String>(
+    'genres',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -80,6 +118,10 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
     coverPath,
     status,
     inLibrary,
+    url,
+    synopsis,
+    author,
+    genres,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -136,6 +178,30 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
         inLibrary.isAcceptableOrUnknown(data['in_library']!, _inLibraryMeta),
       );
     }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    if (data.containsKey('synopsis')) {
+      context.handle(
+        _synopsisMeta,
+        synopsis.isAcceptableOrUnknown(data['synopsis']!, _synopsisMeta),
+      );
+    }
+    if (data.containsKey('author')) {
+      context.handle(
+        _authorMeta,
+        author.isAcceptableOrUnknown(data['author']!, _authorMeta),
+      );
+    }
+    if (data.containsKey('genres')) {
+      context.handle(
+        _genresMeta,
+        genres.isAcceptableOrUnknown(data['genres']!, _genresMeta),
+      );
+    }
     return context;
   }
 
@@ -169,6 +235,22 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
         DriftSqlType.bool,
         data['${effectivePrefix}in_library'],
       )!,
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+      synopsis: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}synopsis'],
+      ),
+      author: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author'],
+      ),
+      genres: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}genres'],
+      ),
     );
   }
 
@@ -185,6 +267,10 @@ class Manga extends DataClass implements Insertable<Manga> {
   final String coverPath;
   final String status;
   final bool inLibrary;
+  final String? url;
+  final String? synopsis;
+  final String? author;
+  final String? genres;
   const Manga({
     required this.id,
     required this.sourceId,
@@ -192,6 +278,10 @@ class Manga extends DataClass implements Insertable<Manga> {
     required this.coverPath,
     required this.status,
     required this.inLibrary,
+    this.url,
+    this.synopsis,
+    this.author,
+    this.genres,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -202,6 +292,18 @@ class Manga extends DataClass implements Insertable<Manga> {
     map['cover_path'] = Variable<String>(coverPath);
     map['status'] = Variable<String>(status);
     map['in_library'] = Variable<bool>(inLibrary);
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    if (!nullToAbsent || synopsis != null) {
+      map['synopsis'] = Variable<String>(synopsis);
+    }
+    if (!nullToAbsent || author != null) {
+      map['author'] = Variable<String>(author);
+    }
+    if (!nullToAbsent || genres != null) {
+      map['genres'] = Variable<String>(genres);
+    }
     return map;
   }
 
@@ -213,6 +315,16 @@ class Manga extends DataClass implements Insertable<Manga> {
       coverPath: Value(coverPath),
       status: Value(status),
       inLibrary: Value(inLibrary),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      synopsis: synopsis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(synopsis),
+      author: author == null && nullToAbsent
+          ? const Value.absent()
+          : Value(author),
+      genres: genres == null && nullToAbsent
+          ? const Value.absent()
+          : Value(genres),
     );
   }
 
@@ -228,6 +340,10 @@ class Manga extends DataClass implements Insertable<Manga> {
       coverPath: serializer.fromJson<String>(json['coverPath']),
       status: serializer.fromJson<String>(json['status']),
       inLibrary: serializer.fromJson<bool>(json['inLibrary']),
+      url: serializer.fromJson<String?>(json['url']),
+      synopsis: serializer.fromJson<String?>(json['synopsis']),
+      author: serializer.fromJson<String?>(json['author']),
+      genres: serializer.fromJson<String?>(json['genres']),
     );
   }
   @override
@@ -240,6 +356,10 @@ class Manga extends DataClass implements Insertable<Manga> {
       'coverPath': serializer.toJson<String>(coverPath),
       'status': serializer.toJson<String>(status),
       'inLibrary': serializer.toJson<bool>(inLibrary),
+      'url': serializer.toJson<String?>(url),
+      'synopsis': serializer.toJson<String?>(synopsis),
+      'author': serializer.toJson<String?>(author),
+      'genres': serializer.toJson<String?>(genres),
     };
   }
 
@@ -250,6 +370,10 @@ class Manga extends DataClass implements Insertable<Manga> {
     String? coverPath,
     String? status,
     bool? inLibrary,
+    Value<String?> url = const Value.absent(),
+    Value<String?> synopsis = const Value.absent(),
+    Value<String?> author = const Value.absent(),
+    Value<String?> genres = const Value.absent(),
   }) => Manga(
     id: id ?? this.id,
     sourceId: sourceId ?? this.sourceId,
@@ -257,6 +381,10 @@ class Manga extends DataClass implements Insertable<Manga> {
     coverPath: coverPath ?? this.coverPath,
     status: status ?? this.status,
     inLibrary: inLibrary ?? this.inLibrary,
+    url: url.present ? url.value : this.url,
+    synopsis: synopsis.present ? synopsis.value : this.synopsis,
+    author: author.present ? author.value : this.author,
+    genres: genres.present ? genres.value : this.genres,
   );
   Manga copyWithCompanion(MangasCompanion data) {
     return Manga(
@@ -266,6 +394,10 @@ class Manga extends DataClass implements Insertable<Manga> {
       coverPath: data.coverPath.present ? data.coverPath.value : this.coverPath,
       status: data.status.present ? data.status.value : this.status,
       inLibrary: data.inLibrary.present ? data.inLibrary.value : this.inLibrary,
+      url: data.url.present ? data.url.value : this.url,
+      synopsis: data.synopsis.present ? data.synopsis.value : this.synopsis,
+      author: data.author.present ? data.author.value : this.author,
+      genres: data.genres.present ? data.genres.value : this.genres,
     );
   }
 
@@ -277,14 +409,28 @@ class Manga extends DataClass implements Insertable<Manga> {
           ..write('title: $title, ')
           ..write('coverPath: $coverPath, ')
           ..write('status: $status, ')
-          ..write('inLibrary: $inLibrary')
+          ..write('inLibrary: $inLibrary, ')
+          ..write('url: $url, ')
+          ..write('synopsis: $synopsis, ')
+          ..write('author: $author, ')
+          ..write('genres: $genres')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, sourceId, title, coverPath, status, inLibrary);
+  int get hashCode => Object.hash(
+    id,
+    sourceId,
+    title,
+    coverPath,
+    status,
+    inLibrary,
+    url,
+    synopsis,
+    author,
+    genres,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -294,7 +440,11 @@ class Manga extends DataClass implements Insertable<Manga> {
           other.title == this.title &&
           other.coverPath == this.coverPath &&
           other.status == this.status &&
-          other.inLibrary == this.inLibrary);
+          other.inLibrary == this.inLibrary &&
+          other.url == this.url &&
+          other.synopsis == this.synopsis &&
+          other.author == this.author &&
+          other.genres == this.genres);
 }
 
 class MangasCompanion extends UpdateCompanion<Manga> {
@@ -304,6 +454,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   final Value<String> coverPath;
   final Value<String> status;
   final Value<bool> inLibrary;
+  final Value<String?> url;
+  final Value<String?> synopsis;
+  final Value<String?> author;
+  final Value<String?> genres;
   final Value<int> rowid;
   const MangasCompanion({
     this.id = const Value.absent(),
@@ -312,6 +466,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     this.coverPath = const Value.absent(),
     this.status = const Value.absent(),
     this.inLibrary = const Value.absent(),
+    this.url = const Value.absent(),
+    this.synopsis = const Value.absent(),
+    this.author = const Value.absent(),
+    this.genres = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MangasCompanion.insert({
@@ -321,6 +479,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     required String coverPath,
     required String status,
     this.inLibrary = const Value.absent(),
+    this.url = const Value.absent(),
+    this.synopsis = const Value.absent(),
+    this.author = const Value.absent(),
+    this.genres = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sourceId = Value(sourceId),
@@ -334,6 +496,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     Expression<String>? coverPath,
     Expression<String>? status,
     Expression<bool>? inLibrary,
+    Expression<String>? url,
+    Expression<String>? synopsis,
+    Expression<String>? author,
+    Expression<String>? genres,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -343,6 +509,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
       if (coverPath != null) 'cover_path': coverPath,
       if (status != null) 'status': status,
       if (inLibrary != null) 'in_library': inLibrary,
+      if (url != null) 'url': url,
+      if (synopsis != null) 'synopsis': synopsis,
+      if (author != null) 'author': author,
+      if (genres != null) 'genres': genres,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -354,6 +524,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     Value<String>? coverPath,
     Value<String>? status,
     Value<bool>? inLibrary,
+    Value<String?>? url,
+    Value<String?>? synopsis,
+    Value<String?>? author,
+    Value<String?>? genres,
     Value<int>? rowid,
   }) {
     return MangasCompanion(
@@ -363,6 +537,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
       coverPath: coverPath ?? this.coverPath,
       status: status ?? this.status,
       inLibrary: inLibrary ?? this.inLibrary,
+      url: url ?? this.url,
+      synopsis: synopsis ?? this.synopsis,
+      author: author ?? this.author,
+      genres: genres ?? this.genres,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -388,6 +566,18 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     if (inLibrary.present) {
       map['in_library'] = Variable<bool>(inLibrary.value);
     }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    if (synopsis.present) {
+      map['synopsis'] = Variable<String>(synopsis.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (genres.present) {
+      map['genres'] = Variable<String>(genres.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -403,6 +593,10 @@ class MangasCompanion extends UpdateCompanion<Manga> {
           ..write('coverPath: $coverPath, ')
           ..write('status: $status, ')
           ..write('inLibrary: $inLibrary, ')
+          ..write('url: $url, ')
+          ..write('synopsis: $synopsis, ')
+          ..write('author: $author, ')
+          ..write('genres: $genres, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -501,6 +695,17 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _uploadedAtMeta = const VerificationMeta(
+    'uploadedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> uploadedAt = GeneratedColumn<DateTime>(
+    'uploaded_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -511,6 +716,7 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
     isDownloaded,
     localPath,
     pageCount,
+    uploadedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -582,6 +788,12 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
         pageCount.isAcceptableOrUnknown(data['page_count']!, _pageCountMeta),
       );
     }
+    if (data.containsKey('uploaded_at')) {
+      context.handle(
+        _uploadedAtMeta,
+        uploadedAt.isAcceptableOrUnknown(data['uploaded_at']!, _uploadedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -623,6 +835,10 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
         DriftSqlType.int,
         data['${effectivePrefix}page_count'],
       ),
+      uploadedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}uploaded_at'],
+      ),
     );
   }
 
@@ -641,6 +857,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
   final bool isDownloaded;
   final String? localPath;
   final int? pageCount;
+  final DateTime? uploadedAt;
   const Chapter({
     required this.id,
     required this.mangaId,
@@ -650,6 +867,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
     required this.isDownloaded,
     this.localPath,
     this.pageCount,
+    this.uploadedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -665,6 +883,9 @@ class Chapter extends DataClass implements Insertable<Chapter> {
     }
     if (!nullToAbsent || pageCount != null) {
       map['page_count'] = Variable<int>(pageCount);
+    }
+    if (!nullToAbsent || uploadedAt != null) {
+      map['uploaded_at'] = Variable<DateTime>(uploadedAt);
     }
     return map;
   }
@@ -683,6 +904,9 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       pageCount: pageCount == null && nullToAbsent
           ? const Value.absent()
           : Value(pageCount),
+      uploadedAt: uploadedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(uploadedAt),
     );
   }
 
@@ -700,6 +924,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       isDownloaded: serializer.fromJson<bool>(json['isDownloaded']),
       localPath: serializer.fromJson<String?>(json['localPath']),
       pageCount: serializer.fromJson<int?>(json['pageCount']),
+      uploadedAt: serializer.fromJson<DateTime?>(json['uploadedAt']),
     );
   }
   @override
@@ -714,6 +939,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       'isDownloaded': serializer.toJson<bool>(isDownloaded),
       'localPath': serializer.toJson<String?>(localPath),
       'pageCount': serializer.toJson<int?>(pageCount),
+      'uploadedAt': serializer.toJson<DateTime?>(uploadedAt),
     };
   }
 
@@ -726,6 +952,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
     bool? isDownloaded,
     Value<String?> localPath = const Value.absent(),
     Value<int?> pageCount = const Value.absent(),
+    Value<DateTime?> uploadedAt = const Value.absent(),
   }) => Chapter(
     id: id ?? this.id,
     mangaId: mangaId ?? this.mangaId,
@@ -735,6 +962,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
     isDownloaded: isDownloaded ?? this.isDownloaded,
     localPath: localPath.present ? localPath.value : this.localPath,
     pageCount: pageCount.present ? pageCount.value : this.pageCount,
+    uploadedAt: uploadedAt.present ? uploadedAt.value : this.uploadedAt,
   );
   Chapter copyWithCompanion(ChaptersCompanion data) {
     return Chapter(
@@ -748,6 +976,9 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           : this.isDownloaded,
       localPath: data.localPath.present ? data.localPath.value : this.localPath,
       pageCount: data.pageCount.present ? data.pageCount.value : this.pageCount,
+      uploadedAt: data.uploadedAt.present
+          ? data.uploadedAt.value
+          : this.uploadedAt,
     );
   }
 
@@ -761,7 +992,8 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           ..write('url: $url, ')
           ..write('isDownloaded: $isDownloaded, ')
           ..write('localPath: $localPath, ')
-          ..write('pageCount: $pageCount')
+          ..write('pageCount: $pageCount, ')
+          ..write('uploadedAt: $uploadedAt')
           ..write(')'))
         .toString();
   }
@@ -776,6 +1008,7 @@ class Chapter extends DataClass implements Insertable<Chapter> {
     isDownloaded,
     localPath,
     pageCount,
+    uploadedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -788,7 +1021,8 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           other.url == this.url &&
           other.isDownloaded == this.isDownloaded &&
           other.localPath == this.localPath &&
-          other.pageCount == this.pageCount);
+          other.pageCount == this.pageCount &&
+          other.uploadedAt == this.uploadedAt);
 }
 
 class ChaptersCompanion extends UpdateCompanion<Chapter> {
@@ -800,6 +1034,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
   final Value<bool> isDownloaded;
   final Value<String?> localPath;
   final Value<int?> pageCount;
+  final Value<DateTime?> uploadedAt;
   final Value<int> rowid;
   const ChaptersCompanion({
     this.id = const Value.absent(),
@@ -810,6 +1045,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     this.isDownloaded = const Value.absent(),
     this.localPath = const Value.absent(),
     this.pageCount = const Value.absent(),
+    this.uploadedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChaptersCompanion.insert({
@@ -821,6 +1057,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     this.isDownloaded = const Value.absent(),
     this.localPath = const Value.absent(),
     this.pageCount = const Value.absent(),
+    this.uploadedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        mangaId = Value(mangaId),
@@ -836,6 +1073,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     Expression<bool>? isDownloaded,
     Expression<String>? localPath,
     Expression<int>? pageCount,
+    Expression<DateTime>? uploadedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -847,6 +1085,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
       if (isDownloaded != null) 'is_downloaded': isDownloaded,
       if (localPath != null) 'local_path': localPath,
       if (pageCount != null) 'page_count': pageCount,
+      if (uploadedAt != null) 'uploaded_at': uploadedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -860,6 +1099,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     Value<bool>? isDownloaded,
     Value<String?>? localPath,
     Value<int?>? pageCount,
+    Value<DateTime?>? uploadedAt,
     Value<int>? rowid,
   }) {
     return ChaptersCompanion(
@@ -871,6 +1111,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
       isDownloaded: isDownloaded ?? this.isDownloaded,
       localPath: localPath ?? this.localPath,
       pageCount: pageCount ?? this.pageCount,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -902,6 +1143,9 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     if (pageCount.present) {
       map['page_count'] = Variable<int>(pageCount.value);
     }
+    if (uploadedAt.present) {
+      map['uploaded_at'] = Variable<DateTime>(uploadedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -919,6 +1163,7 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
           ..write('isDownloaded: $isDownloaded, ')
           ..write('localPath: $localPath, ')
           ..write('pageCount: $pageCount, ')
+          ..write('uploadedAt: $uploadedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1913,6 +2158,10 @@ typedef $$MangasTableCreateCompanionBuilder =
       required String coverPath,
       required String status,
       Value<bool> inLibrary,
+      Value<String?> url,
+      Value<String?> synopsis,
+      Value<String?> author,
+      Value<String?> genres,
       Value<int> rowid,
     });
 typedef $$MangasTableUpdateCompanionBuilder =
@@ -1923,6 +2172,10 @@ typedef $$MangasTableUpdateCompanionBuilder =
       Value<String> coverPath,
       Value<String> status,
       Value<bool> inLibrary,
+      Value<String?> url,
+      Value<String?> synopsis,
+      Value<String?> author,
+      Value<String?> genres,
       Value<int> rowid,
     });
 
@@ -1986,6 +2239,26 @@ class $$MangasTableFilterComposer
 
   ColumnFilters<bool> get inLibrary => $composableBuilder(
     column: $table.inLibrary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get synopsis => $composableBuilder(
+    column: $table.synopsis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get genres => $composableBuilder(
+    column: $table.genres,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2053,6 +2326,26 @@ class $$MangasTableOrderingComposer
     column: $table.inLibrary,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get synopsis => $composableBuilder(
+    column: $table.synopsis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get genres => $composableBuilder(
+    column: $table.genres,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MangasTableAnnotationComposer
@@ -2081,6 +2374,18 @@ class $$MangasTableAnnotationComposer
 
   GeneratedColumn<bool> get inLibrary =>
       $composableBuilder(column: $table.inLibrary, builder: (column) => column);
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get synopsis =>
+      $composableBuilder(column: $table.synopsis, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<String> get genres =>
+      $composableBuilder(column: $table.genres, builder: (column) => column);
 
   Expression<T> chaptersRefs<T extends Object>(
     Expression<T> Function($$ChaptersTableAnnotationComposer a) f,
@@ -2142,6 +2447,10 @@ class $$MangasTableTableManager
                 Value<String> coverPath = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<bool> inLibrary = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> synopsis = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<String?> genres = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MangasCompanion(
                 id: id,
@@ -2150,6 +2459,10 @@ class $$MangasTableTableManager
                 coverPath: coverPath,
                 status: status,
                 inLibrary: inLibrary,
+                url: url,
+                synopsis: synopsis,
+                author: author,
+                genres: genres,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2160,6 +2473,10 @@ class $$MangasTableTableManager
                 required String coverPath,
                 required String status,
                 Value<bool> inLibrary = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> synopsis = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<String?> genres = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MangasCompanion.insert(
                 id: id,
@@ -2168,6 +2485,10 @@ class $$MangasTableTableManager
                 coverPath: coverPath,
                 status: status,
                 inLibrary: inLibrary,
+                url: url,
+                synopsis: synopsis,
+                author: author,
+                genres: genres,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2226,6 +2547,7 @@ typedef $$ChaptersTableCreateCompanionBuilder =
       Value<bool> isDownloaded,
       Value<String?> localPath,
       Value<int?> pageCount,
+      Value<DateTime?> uploadedAt,
       Value<int> rowid,
     });
 typedef $$ChaptersTableUpdateCompanionBuilder =
@@ -2238,6 +2560,7 @@ typedef $$ChaptersTableUpdateCompanionBuilder =
       Value<bool> isDownloaded,
       Value<String?> localPath,
       Value<int?> pageCount,
+      Value<DateTime?> uploadedAt,
       Value<int> rowid,
     });
 
@@ -2328,6 +2651,11 @@ class $$ChaptersTableFilterComposer
 
   ColumnFilters<int> get pageCount => $composableBuilder(
     column: $table.pageCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2424,6 +2752,11 @@ class $$ChaptersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$MangasTableOrderingComposer get mangaId {
     final $$MangasTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2479,6 +2812,11 @@ class $$ChaptersTableAnnotationComposer
 
   GeneratedColumn<int> get pageCount =>
       $composableBuilder(column: $table.pageCount, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => column,
+  );
 
   $$MangasTableAnnotationComposer get mangaId {
     final $$MangasTableAnnotationComposer composer = $composerBuilder(
@@ -2565,6 +2903,7 @@ class $$ChaptersTableTableManager
                 Value<bool> isDownloaded = const Value.absent(),
                 Value<String?> localPath = const Value.absent(),
                 Value<int?> pageCount = const Value.absent(),
+                Value<DateTime?> uploadedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChaptersCompanion(
                 id: id,
@@ -2575,6 +2914,7 @@ class $$ChaptersTableTableManager
                 isDownloaded: isDownloaded,
                 localPath: localPath,
                 pageCount: pageCount,
+                uploadedAt: uploadedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2587,6 +2927,7 @@ class $$ChaptersTableTableManager
                 Value<bool> isDownloaded = const Value.absent(),
                 Value<String?> localPath = const Value.absent(),
                 Value<int?> pageCount = const Value.absent(),
+                Value<DateTime?> uploadedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChaptersCompanion.insert(
                 id: id,
@@ -2597,6 +2938,7 @@ class $$ChaptersTableTableManager
                 isDownloaded: isDownloaded,
                 localPath: localPath,
                 pageCount: pageCount,
+                uploadedAt: uploadedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -4,11 +4,13 @@ class ChapterSummary {
     required this.title,
     required this.number,
     required this.url,
+    this.uploadedAt,
   });
   final String id;
   final String title;
   final double number;
   final String url;
+  final DateTime? uploadedAt;
 }
 
 class Chapter {

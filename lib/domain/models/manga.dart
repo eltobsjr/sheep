@@ -21,6 +21,7 @@ class MangaDetails {
     required this.synopsis,
     required this.status,
     required this.authors,
+    this.genres = const [],
   });
   final String id;
   final String title;
@@ -28,6 +29,7 @@ class MangaDetails {
   final String synopsis;
   final MangaStatus status;
   final List<String> authors;
+  final List<String> genres;
 }
 
 class Manga {

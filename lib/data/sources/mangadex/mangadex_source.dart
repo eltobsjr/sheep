@@ -180,6 +180,19 @@ class MangaDexSource extends HttpMangaSource {
     final descMap = (attrs['description'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
     final desc = (descMap[lang] as String?) ?? (descMap['en'] as String?) ?? '';
 
+    final tagList = (attrs['tags'] as List<dynamic>?) ?? const [];
+    final genres = tagList
+        .where((t) =>
+            ((t as Map<String, dynamic>)['attributes'] as Map<String, dynamic>?)?['group'] ==
+            'genre')
+        .map((t) {
+          final n = ((t as Map<String, dynamic>)['attributes'] as Map<String, dynamic>)['name']
+              as Map<String, dynamic>;
+          return (n['en'] ?? n.values.firstOrNull) as String? ?? '';
+        })
+        .where((g) => g.isNotEmpty)
+        .toList();
+
     return MangaDetails(
       id: mangaId,
       title: _title(attrs['title'] as Map<String, dynamic>),
@@ -187,6 +200,7 @@ class MangaDexSource extends HttpMangaSource {
       synopsis: desc,
       status: _toStatus(attrs['status'] as String?),
       authors: _authors(rels),
+      genres: genres,
     );
   }
 
@@ -225,7 +239,14 @@ class MangaDexSource extends HttpMangaSource {
             ? chTitle
             : (numStr != null ? 'Cap. $numStr' : 'Sem título');
 
-        all.add(ChapterSummary(id: chId, title: title, number: number, url: chId));
+        final publishAt = attrs['publishAt'] as String?;
+        all.add(ChapterSummary(
+          id: chId,
+          title: title,
+          number: number,
+          url: chId,
+          uploadedAt: publishAt != null ? DateTime.tryParse(publishAt) : null,
+        ));
       }
 
       offset += data.length;
