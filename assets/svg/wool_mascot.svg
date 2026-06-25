@@ -17,6 +17,8 @@
   <rect x="51" y="86" width="9" height="22" rx="4.5" fill="currentColor"/>
   <rect x="63" y="85" width="9" height="22" rx="4.5" fill="currentColor"/>
   <!-- Eyes -->
-  <circle cx="45" cy="26" r="2.2" fill="#FAFAFA"/>
-  <circle cx="55" cy="26" r="2.2" fill="#FAFAFA"/>
+  <circle cx="45" cy="26" r="2.5" fill="#FAFAFA"/>
+  <circle cx="55" cy="26" r="2.5" fill="#FAFAFA"/>
+  <!-- Mouth -->
+  <ellipse cx="50" cy="33" rx="3.5" ry="2.5" fill="#FAFAFA" opacity=".55"/>
 </svg>
