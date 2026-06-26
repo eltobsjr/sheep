@@ -93,76 +93,38 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
-            // ── Language tabs ─────────────────────────────────────────────────
+            // ── Language dropdown ─────────────────────────────────────────────
             SliverToBoxAdapter(
-              child: SizedBox(
-                height: 36,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                  children: [
-                    for (final (lang, label) in [
-                      ('all', 'All'),
-                      ('pt-br', 'PT-BR'),
-                      ('en', 'EN'),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () {
-                            ref.read(selectedLanguageProvider.notifier).state =
-                                lang;
-                            // Auto-select first source of this language
-                            final first = lang == 'all'
-                                ? orderedIds.firstOrNull
-                                : orderedIds.firstWhere(
-                                    (id) => sourceById(id)?.language == lang,
-                                    orElse: () => orderedIds.first,
-                                  );
-                            if (first != null) {
-                              ref.read(selectedSourceIdProvider.notifier).state =
-                                  first;
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selectedLang == lang ? c.ink : c.wool,
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(radiusPill),
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                height: 1,
-                                color: selectedLang == lang ? c.paper : c.slate,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                child: _LanguageDropdown(
+                  selected: selectedLang,
+                  onChanged: (lang) {
+                    ref.read(selectedLanguageProvider.notifier).state = lang;
+                    final first = lang == 'all'
+                        ? orderedIds.firstOrNull
+                        : orderedIds.firstWhere(
+                            (id) => sourceById(id)?.language == lang,
+                            orElse: () => orderedIds.firstOrNull ?? '',
+                          );
+                    if (first != null && first.isNotEmpty) {
+                      ref.read(selectedSourceIdProvider.notifier).state = first;
+                    }
+                  },
                 ),
               ),
             ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-            // ── Source chips (drag to reorder) ────────────────────────────────
+            // ── Source chips (long-press to reorder when All is selected) ───────
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 36,
                 child: ReorderableListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                  buildDefaultDragHandles: selectedLang == 'all',
+                  buildDefaultDragHandles: false,
                   proxyDecorator: (child, index, animation) => Material(
                     color: Colors.transparent,
                     child: child,
@@ -180,61 +142,58 @@ class BrowseScreen extends ConsumerWidget {
                       return SizedBox.shrink(key: ValueKey(sourceId));
                     }
                     final active = sourceId == selectedId;
+                    final canDrag = selectedLang == 'all';
+                    final chip = GestureDetector(
+                      onTap: () => ref
+                          .read(selectedSourceIdProvider.notifier)
+                          .state = sourceId,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: active ? c.ink : c.wool,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(radiusPill),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (active) ...[
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: c.paper,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(
+                              source.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                height: 1,
+                                color: active ? c.paper : c.slate,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                     return Padding(
                       key: ValueKey(sourceId),
                       padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () => ref
-                            .read(selectedSourceIdProvider.notifier)
-                            .state = sourceId,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: active ? c.ink : c.wool,
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(radiusPill),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (active) ...[
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: c.paper,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                              ],
-                              Text(
-                                source.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  height: 1,
-                                  color: active ? c.paper : c.slate,
-                                ),
-                              ),
-                              if (selectedLang == 'all') ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.drag_handle,
-                                  size: 12,
-                                  color: active
-                                      ? c.paper.withValues(alpha: 0.6)
-                                      : c.slate.withValues(alpha: 0.5),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
+                      child: canDrag
+                          ? ReorderableDelayedDragStartListener(
+                              index: i,
+                              child: chip,
+                            )
+                          : chip,
                     );
                   },
                 ),
@@ -750,6 +709,109 @@ class _RemoteCover extends StatelessWidget {
         }
         return null;
       },
+    );
+  }
+}
+
+// ── Language dropdown ─────────────────────────────────────────────────────────
+
+class _LanguageDropdown extends StatelessWidget {
+  const _LanguageDropdown({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final String selected;
+  final void Function(String) onChanged;
+
+  static const _options = [
+    ('all', 'All'),
+    ('pt-br', 'PT-BR'),
+    ('en', 'EN'),
+  ];
+
+  String get _label =>
+      _options.firstWhere((o) => o.$1 == selected, orElse: () => ('all', 'All')).$2;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = SheepColors.of(context);
+    return GestureDetector(
+      onTap: () async {
+        final RenderBox box = context.findRenderObject()! as RenderBox;
+        final offset = box.localToGlobal(Offset.zero);
+        final chosen = await showMenu<String>(
+          context: context,
+          color: c.paper,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusCard),
+            side: BorderSide(color: c.wool, width: 1),
+          ),
+          position: RelativeRect.fromLTRB(
+            offset.dx,
+            offset.dy + box.size.height + 4,
+            offset.dx + box.size.width,
+            0,
+          ),
+          items: [
+            for (final (lang, label) in _options)
+              PopupMenuItem<String>(
+                value: lang,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontFamily: fontDisplay,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: lang == selected ? c.ink : c.slate,
+                        ),
+                      ),
+                    ),
+                    if (lang == selected)
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: c.ink,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        );
+        if (chosen != null) onChanged(chosen);
+      },
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: c.wool,
+          borderRadius: const BorderRadius.all(Radius.circular(radiusPill)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                height: 1,
+                color: c.slate,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: c.slate),
+          ],
+        ),
+      ),
     );
   }
 }

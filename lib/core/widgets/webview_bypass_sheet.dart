@@ -44,6 +44,7 @@ class _WebViewBypassSheetState extends State<WebViewBypassSheet> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
         onPageFinished: _onPageFinished,
+        onNavigationRequest: (request) => _allowNavigation(request.url),
       ))
       ..loadRequest(Uri.parse(widget.url));
   }
@@ -57,6 +58,40 @@ class _WebViewBypassSheetState extends State<WebViewBypassSheet> {
       CloudflareBypassService.instance.resolveBypass(widget.url);
       if (mounted) Navigator.of(context).pop();
     }
+  }
+
+  // Allows navigation only to the source domain and Cloudflare challenge hosts.
+  // Blocks ads, bet sites, app deep links, and any unrelated domain.
+  NavigationDecision _allowNavigation(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return NavigationDecision.prevent;
+
+    // Block non-web schemes immediately (shopeebr://, intent://, etc.)
+    if (uri.scheme != 'https' && uri.scheme != 'http') {
+      return NavigationDecision.prevent;
+    }
+
+    final host = uri.host.toLowerCase();
+    final sourceHost =
+        Uri.tryParse(widget.url)?.host.toLowerCase() ?? '';
+
+    // Allow the source domain and any of its subdomains.
+    if (host == sourceHost || host.endsWith('.$sourceHost')) {
+      return NavigationDecision.navigate;
+    }
+
+    // Allow Cloudflare challenge and CDN infrastructure.
+    const cfHosts = {
+      'challenges.cloudflare.com',
+      'cloudflare.com',
+      'cdn-cgi',
+    };
+    if (cfHosts.any((cf) => host == cf || host.endsWith('.$cf'))) {
+      return NavigationDecision.navigate;
+    }
+
+    // Block everything else (ads, bets, trackers, unrelated sites).
+    return NavigationDecision.prevent;
   }
 
   // Reads the full cookie string for [url] from Android's CookieManager.
