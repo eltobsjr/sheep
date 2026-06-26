@@ -28,7 +28,6 @@ class MangaDetailScreen extends ConsumerStatefulWidget {
 
 class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
   bool _synopsisExpanded = false;
-  bool _offlineOnly = false;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +36,7 @@ class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
     final chaptersAsync = ref.watch(chaptersWatchProvider(widget.mangaId));
     // Trigger fetch from source — loads chapters and cover on first open
     final fetchAsync = ref.watch(fetchMangaDetailProvider(widget.mangaId));
+    final offlineOnly = ref.watch(offlineOnlyProvider);
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -49,11 +49,12 @@ class _MangaDetailScreenState extends ConsumerState<MangaDetailScreen> {
           chaptersAsync: chaptersAsync,
           fetchAsync: fetchAsync,
           synopsisExpanded: _synopsisExpanded,
-          offlineOnly: _offlineOnly,
+          offlineOnly: offlineOnly,
           onToggleSynopsis: () =>
               setState(() => _synopsisExpanded = !_synopsisExpanded),
-          onToggleOfflineOnly: () =>
-              setState(() => _offlineOnly = !_offlineOnly),
+          onToggleOfflineOnly: () => ref
+              .read(offlineOnlyProvider.notifier)
+              .state = !ref.read(offlineOnlyProvider),
         ),
       ),
     );
@@ -136,10 +137,11 @@ class _DetailBody extends ConsumerWidget {
       (mx, ch) => (readMap[ch.id] == true && ch.number > mx) ? ch.number : mx,
     );
     final hasReadProgress = lastReadNum >= 0;
+    final lastChapter = sortedAsc.isNotEmpty ? sortedAsc.last : null;
     final continueChapter = hasReadProgress
         ? sortedAsc.firstWhere(
             (ch) => ch.number > lastReadNum && (readMap[ch.id] != true),
-            orElse: () => firstChapter!,
+            orElse: () => lastChapter!,
           )
         : firstChapter;
 
@@ -199,7 +201,7 @@ class _DetailBody extends ConsumerWidget {
                           ),
                         ),
                         const Text(
-                          'Back',
+                          '← Library',
                           style: TextStyle(
                             fontSize: 13,
                             height: 1,
@@ -269,9 +271,9 @@ class _DetailBody extends ConsumerWidget {
                           ),
                           bgColor: c.wool,
                         ),
-                      if (chapters.isNotEmpty)
+                      if (allChapters.isNotEmpty)
                         _Chip(
-                          text: '${chapters.length} ch',
+                          text: '${allChapters.length} ch',
                           textStyle: TextStyle(
                             fontFamily: fontMono,
                             fontWeight: FontWeight.w400,
@@ -628,13 +630,13 @@ class _HeroCover extends StatelessWidget {
       if (file.existsSync()) {
         return SizedBox(
           width: double.infinity,
-          height: 220,
+          height: 280,
           child: Image.file(
             file,
             fit: BoxFit.cover,
             errorBuilder: (_, _, _) => ColoredBox(
               color: heroColor,
-              child: const SizedBox(height: 220),
+              child: const SizedBox(height: 280),
             ),
           ),
         );
@@ -642,7 +644,7 @@ class _HeroCover extends StatelessWidget {
     }
     return ColoredBox(
       color: heroColor,
-      child: const SizedBox(width: double.infinity, height: 220),
+      child: const SizedBox(width: double.infinity, height: 280),
     );
   }
 }

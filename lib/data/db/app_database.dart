@@ -84,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -100,6 +100,26 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.addColumn(readingProgress, readingProgress.isRead);
+      }
+      if (from < 5) {
+        // Recreate download_queue with chapter_id as PRIMARY KEY.
+        // SQLite does not support ALTER TABLE ADD PRIMARY KEY.
+        await m.database.customStatement(
+          'CREATE TABLE IF NOT EXISTS download_queue_new ('
+          '  chapter_id TEXT NOT NULL PRIMARY KEY, '
+          '  status TEXT NOT NULL, '
+          '  progress INTEGER NOT NULL DEFAULT 0, '
+          '  retries INTEGER NOT NULL DEFAULT 0'
+          ')',
+        );
+        await m.database.customStatement(
+          'INSERT OR IGNORE INTO download_queue_new '
+          'SELECT chapter_id, status, progress, retries FROM download_queue',
+        );
+        await m.database.customStatement('DROP TABLE download_queue');
+        await m.database.customStatement(
+          'ALTER TABLE download_queue_new RENAME TO download_queue',
+        );
       }
     },
   );
@@ -272,11 +292,7 @@ class AppDatabase extends _$AppDatabase {
   // ── Download queue ────────────────────────────────────────────────────────
 
   Future<void> queueDownload(String chapterId) async {
-    final existing = await (select(downloadQueue)
-          ..where((d) => d.chapterId.equals(chapterId)))
-        .getSingleOrNull();
-    if (existing != null) return;
-    await into(downloadQueue).insert(
+    await into(downloadQueue).insertOnConflictUpdate(
       DownloadQueueCompanion.insert(chapterId: chapterId, status: 'queued'),
     );
   }

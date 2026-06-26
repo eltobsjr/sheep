@@ -48,10 +48,10 @@ class DownloadService {
 
   // Cancels and removes a specific chapter from the queue.
   Future<void> cancel(String chapterId) async {
+    await _db.cancelDownload(chapterId);
     if (chapterId == _currentChapterId) {
       _cancelToken?.cancel('cancelled');
     }
-    await _db.cancelDownload(chapterId);
     // Clean up any partial tmp directory.
     try {
       final chapter = await _db.watchChapterById(chapterId).first;
@@ -152,7 +152,11 @@ class DownloadService {
           options: Options(responseType: ResponseType.bytes),
           cancelToken: cancelToken,
         );
-        await file.writeAsBytes(resp.data ?? []);
+        final bytes = resp.data;
+        if (bytes == null || bytes.isEmpty) {
+          throw Exception('Empty page at index $i for chapter $chapterId');
+        }
+        await file.writeAsBytes(bytes);
       } else {
         final dio = Dio();
         final resp = await dio.get<List<int>>(
@@ -160,7 +164,11 @@ class DownloadService {
           options: Options(responseType: ResponseType.bytes),
           cancelToken: cancelToken,
         );
-        await file.writeAsBytes(resp.data ?? []);
+        final bytes = resp.data;
+        if (bytes == null || bytes.isEmpty) {
+          throw Exception('Empty page at index $i for chapter $chapterId');
+        }
+        await file.writeAsBytes(bytes);
         dio.close();
       }
 

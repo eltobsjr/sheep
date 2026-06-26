@@ -191,9 +191,19 @@ abstract class MadaraSource extends HttpMangaSource {
         ? '$baseUrl${mangaPath}ajax/chapters/'
         : '$baseUrl/wp-admin/admin-ajax.php';
 
-    final html = useNewChapterEndpoint
-        ? await fetchHtml(chapterListUrl)
-        : await _postChapterList(mangaUrl);
+    String html;
+    if (useNewChapterEndpoint) {
+      final response = await client.post<String>(
+        chapterListUrl,
+        options: Options(
+          contentType: 'application/x-www-form-urlencoded',
+          responseType: ResponseType.plain,
+        ),
+      );
+      html = response.data ?? '';
+    } else {
+      html = await _postChapterList(mangaUrl);
+    }
 
     final doc = html_parser.parse(html);
     final items = doc.querySelectorAll(chapterSelector);

@@ -90,7 +90,14 @@ class SettingsScreen extends ConsumerWidget {
             ),
 
             SliverToBoxAdapter(
-              child: _ChevronRow(label: 'Image quality', value: 'High', c: c),
+              child: _SegmentedRow(
+                label: 'Image quality',
+                options: const ['Low', 'Medium', 'High'],
+                values: const ['low', 'medium', 'high'],
+                selected: s.imageQuality,
+                onChanged: n.setImageQuality,
+                c: c,
+              ),
             ),
 
             // ── Sources ──────────────────────────────────────────────────────

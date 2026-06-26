@@ -19,6 +19,9 @@ final chapterDownloadEntryProvider =
       ref.watch(databaseProvider).watchDownloadEntry(chapterId),
 );
 
+// Persists the offline-only filter across navigation.
+final offlineOnlyProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 // Watches the manga row from Drift by ID.
 final mangaWatchProvider =
     StreamProvider.autoDispose.family<Manga?, String>((ref, mangaId) {

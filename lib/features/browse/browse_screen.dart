@@ -160,14 +160,16 @@ class BrowseScreen extends ConsumerWidget {
                 child: ReorderableListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                  buildDefaultDragHandles: true,
+                  buildDefaultDragHandles: selectedLang == 'all',
                   proxyDecorator: (child, index, animation) => Material(
                     color: Colors.transparent,
                     child: child,
                   ),
-                  onReorder: (oldIndex, newIndex) => ref
-                      .read(sourceOrderProvider.notifier)
-                      .reorder(oldIndex, newIndex),
+                  onReorder: selectedLang == 'all'
+                      ? (oldIndex, newIndex) => ref
+                          .read(sourceOrderProvider.notifier)
+                          .reorder(oldIndex, newIndex)
+                      : (_, __) {},
                   itemCount: filteredIds.length,
                   itemBuilder: (context, i) {
                     final sourceId = filteredIds[i];
@@ -217,6 +219,16 @@ class BrowseScreen extends ConsumerWidget {
                                   color: active ? c.paper : c.slate,
                                 ),
                               ),
+                              if (selectedLang == 'all') ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.drag_handle,
+                                  size: 12,
+                                  color: active
+                                      ? c.paper.withValues(alpha: 0.6)
+                                      : c.slate.withValues(alpha: 0.5),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -286,10 +298,18 @@ class BrowseScreen extends ConsumerWidget {
                         _sourceError(e),
                         style: TextStyle(fontSize: 13, color: c.slate),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        e.toString(),
-                        style: TextStyle(fontSize: 10, color: c.slate),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () => ref.invalidate(popularProvider),
+                        child: Text(
+                          'Tentar novamente',
+                          style: TextStyle(
+                            color: c.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
                       ),
                     ],
                   ),

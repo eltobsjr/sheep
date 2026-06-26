@@ -60,7 +60,47 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       body: SafeArea(
         child: mangasAsync.when(
           loading: () => const Center(child: WoolLoading()),
-          error: (e, _) => _LibraryHeader(showSearch: false, c: c),
+          error: (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Erro ao carregar a biblioteca.',
+                    style: TextStyle(
+                        color: c.ink, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Verifique sua conexão e tente novamente.',
+                    style: TextStyle(color: c.slate, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () => ref.invalidate(libraryMangasProvider),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: c.ink,
+                        borderRadius:
+                            BorderRadius.circular(radiusPill),
+                      ),
+                      child: Text(
+                        'Tentar novamente',
+                        style: TextStyle(
+                            color: c.paper,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           data: (mangas) {
             if (mangas.isEmpty) {
               return _EmptyState(
@@ -382,17 +422,6 @@ class _FilledState extends StatelessWidget {
                     color: c.slate,
                   ),
                 ),
-                SvgPicture.string(
-                  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"'
-                  ' stroke="#6B6B6B" stroke-width="1.5" stroke-linecap="round">'
-                  '<line x1="2" y1="4" x2="12" y2="4"/>'
-                  '<line x1="4" y1="7" x2="10" y2="7"/>'
-                  '<line x1="6" y1="10" x2="8" y2="10"/>'
-                  '</svg>',
-                  width: 14,
-                  height: 14,
-                  colorFilter: ColorFilter.mode(c.slate, BlendMode.srcIn),
-                ),
               ],
             ),
           ),
@@ -711,39 +740,3 @@ class _Placeholder extends StatelessWidget {
   }
 }
 
-// ── Shared header ─────────────────────────────────────────────────────────────
-
-class _LibraryHeader extends StatelessWidget {
-  const _LibraryHeader({required this.showSearch, required this.c});
-
-  final bool showSearch;
-  final SheepColors c;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Library',
-            style: TextStyle(
-              fontFamily: fontDisplay,
-              fontWeight: FontWeight.w700,
-              fontSize: 28,
-              height: 1.1,
-              color: c.ink,
-            ),
-          ),
-          if (showSearch)
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(color: c.wool, shape: BoxShape.circle),
-            ),
-        ],
-      ),
-    );
-  }
-}

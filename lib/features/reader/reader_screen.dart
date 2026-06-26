@@ -138,7 +138,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     String? nextChapterId,
   }) {
     if (pagesAsync.isLoading || initialPageAsync.isLoading) {
-      return const Center(child: WoolLoading());
+      final loadingLabel =
+          _chapterLabel(mangaTitle, chapterAsync.valueOrNull);
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const WoolLoading(),
+            if (loadingLabel.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                loadingLabel,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 13,
+                  fontFamily: fontMono,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
     }
 
     if (pagesAsync.hasError) {
@@ -262,6 +282,7 @@ class _PageViewerState extends State<_PageViewer> {
   late final ScrollController _scrollCtrl;
   late final ExtendedPageController _pageController;
   int _currentPage = 0;
+  bool _scrollRestored = false;
 
   // Per-page GlobalKeys for controlling gesture state (zoom).
   final Map<int, GlobalKey<ExtendedImageGestureState>> _gestureKeys = {};
@@ -274,24 +295,31 @@ class _PageViewerState extends State<_PageViewer> {
         ExtendedPageController(initialPage: widget.initialPage);
     _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
-
-    // Scroll mode: jump to saved position after first layout.
+    // Scroll mode: restore saved position once content has loaded
+    // (maxScrollExtent is 0 on the first frame while images are loading).
     if (widget.isScroll && widget.initialPage > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scrollCtrl.hasClients) return;
-        final max = _scrollCtrl.position.maxScrollExtent;
-        if (max > 0 && widget.pages.length > 1) {
-          _scrollCtrl.jumpTo(
-            max * widget.initialPage / (widget.pages.length - 1),
-          );
-        }
-      });
+      _scrollCtrl.addListener(_restoreScrollOnce);
+    }
+  }
+
+  void _restoreScrollOnce() {
+    if (_scrollRestored || !_scrollCtrl.hasClients) return;
+    final max = _scrollCtrl.position.maxScrollExtent;
+    if (max <= 0) return;
+    _scrollRestored = true;
+    _scrollCtrl.removeListener(_restoreScrollOnce);
+    if (widget.pages.length > 1) {
+      _scrollCtrl.jumpTo(
+        (max * widget.initialPage / (widget.pages.length - 1))
+            .clamp(0.0, max),
+      );
     }
   }
 
   @override
   void dispose() {
     _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.removeListener(_restoreScrollOnce);
     _scrollCtrl.dispose();
     _pageController.dispose();
     super.dispose();
@@ -480,6 +508,13 @@ class _Overlay extends StatelessWidget {
           ),
         ),
 
+        // Clock (top right)
+        Positioned(
+          right: 16,
+          top: topPad + 18,
+          child: const _ClockWidget(),
+        ),
+
         // Chapter title chip (top center)
         Positioned(
           top: topPad + 10,
@@ -596,6 +631,50 @@ class _Overlay extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Clock widget ──────────────────────────────────────────────────────────────
+
+class _ClockWidget extends StatefulWidget {
+  const _ClockWidget();
+
+  @override
+  State<_ClockWidget> createState() => _ClockWidgetState();
+}
+
+class _ClockWidgetState extends State<_ClockWidget> {
+  late Timer _timer;
+  late DateTime _now;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = _now.hour.toString().padLeft(2, '0');
+    final m = _now.minute.toString().padLeft(2, '0');
+    return Text(
+      '$h:$m',
+      style: const TextStyle(
+        fontFamily: fontMono,
+        fontSize: 13,
+        color: Color(0xCCFAFAFA),
+        height: 1,
+      ),
     );
   }
 }

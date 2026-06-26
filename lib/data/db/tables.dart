@@ -53,6 +53,10 @@ class DownloadQueue extends Table {
       integer().withDefault(const Constant(0))();
   IntColumn get retries =>
       integer().withDefault(const Constant(0))();
+
+  @override
+  // ignore: strict_raw_types
+  Set<Column> get primaryKey => {chapterId};
 }
 
 // Stores per-source login credentials and arbitrary auth tokens.

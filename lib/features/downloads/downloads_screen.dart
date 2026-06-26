@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -27,6 +29,17 @@ class DownloadsScreen extends ConsumerWidget {
     final completed = completedAsync.valueOrNull ?? const [];
     final totalChapters =
         active.length + completed.fold(0, (s, e) => s + e.chapterCount);
+    final diskAsync = ref.watch(downloadsDiskUsageProvider);
+    final diskStr = diskAsync.when(
+      data: (bytes) {
+        if (bytes == 0) return '—';
+        if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+        if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+        return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+      },
+      loading: () => '…',
+      error: (_, __) => '—',
+    );
 
     void togglePause() {
       final ds = ref.read(downloadServiceProvider);
@@ -136,7 +149,7 @@ class DownloadsScreen extends ConsumerWidget {
                                   )
                                 else
                                   Text(
-                                    '—',
+                                    diskStr,
                                     style: TextStyle(
                                       fontFamily: fontMono,
                                       fontSize: 12,
@@ -372,7 +385,7 @@ class _ActiveDownloadItem extends StatelessWidget {
 
 // ── Completed item ────────────────────────────────────────────────────────────
 
-class _CompletedItem extends StatelessWidget {
+class _CompletedItem extends ConsumerWidget {
   const _CompletedItem({
     required this.entry,
     required this.onTap,
@@ -398,7 +411,13 @@ class _CompletedItem extends StatelessWidget {
       _colors[entry.mangaId.hashCode.abs() % _colors.length];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final coverPath = ref
+        .watch(downloadMangaCoverProvider(entry.mangaId))
+        .valueOrNull ?? '';
+    final coverFile = coverPath.isNotEmpty ? File(coverPath) : null;
+    final hasCover = coverFile != null && coverFile.existsSync();
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -408,13 +427,17 @@ class _CompletedItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 48,
-              decoration: BoxDecoration(
-                color: _color,
-                borderRadius: BorderRadius.circular(6),
-              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: hasCover
+                  ? Image.file(
+                      coverFile,
+                      width: 36,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _coverPlaceholder,
+                    )
+                  : _coverPlaceholder,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -460,6 +483,12 @@ class _CompletedItem extends StatelessWidget {
       ),
     );
   }
+
+  Widget get _coverPlaceholder => Container(
+        width: 36,
+        height: 48,
+        color: _color,
+      );
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -476,7 +505,11 @@ class _EmptyDownloads extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const WoolLoading(size: 88),
+          SvgPicture.asset(
+            'assets/svg/wool_mascot.svg',
+            width: 88,
+            height: 88,
+          ),
           const SizedBox(height: 20),
           Text(
             'No downloads yet',
