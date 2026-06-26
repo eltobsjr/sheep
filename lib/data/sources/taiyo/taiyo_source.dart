@@ -155,19 +155,36 @@ class TaiyoSource extends HttpMangaSource {
     return [];
   }
 
+  // ── Homepage cache (getPopular, getLatest, search all fetch the same URL) ──
+
+  Future<String>? _homepageFuture;
+  DateTime? _homepageFetchedAt;
+
+  Future<String> _fetchHomepage() {
+    final age = _homepageFetchedAt == null
+        ? null
+        : DateTime.now().difference(_homepageFetchedAt!);
+    if (_homepageFuture != null && age != null && age < const Duration(minutes: 5)) {
+      return _homepageFuture!;
+    }
+    _homepageFetchedAt = DateTime.now();
+    _homepageFuture = fetchHtml(baseUrl);
+    return _homepageFuture!;
+  }
+
   // ── MangaSource ────────────────────────────────────────────────────────────
 
   @override
   Future<List<MangaSummary>> getPopular(int page) async {
     if (page > 1) return [];
-    final html = await fetchHtml(baseUrl);
+    final html = await _fetchHomepage();
     return _parseMangaCards(html);
   }
 
   @override
   Future<List<MangaSummary>> getLatest(int page) async {
     if (page > 1) return [];
-    final html = await fetchHtml(baseUrl);
+    final html = await _fetchHomepage();
     return _parseMangaCards(html);
   }
 
@@ -175,7 +192,7 @@ class TaiyoSource extends HttpMangaSource {
   Future<List<MangaSummary>> search(String query, int page) async {
     // Taiyo has no public search API — filter the homepage list locally.
     if (page > 1) return [];
-    final html = await fetchHtml(baseUrl);
+    final html = await _fetchHomepage();
     final all = _parseMangaCards(html);
     final q = query.toLowerCase();
     return all.where((m) => m.title.toLowerCase().contains(q)).toList();

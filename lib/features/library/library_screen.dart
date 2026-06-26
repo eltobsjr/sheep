@@ -27,16 +27,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool _searching = false;
 
   @override
-  void initState() {
-    super.initState();
-    _searchCtrl.addListener(_onSearch);
-  }
-
-  void _onSearch() => setState(() {});
-
-  @override
   void dispose() {
-    _searchCtrl.removeListener(_onSearch);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -106,15 +97,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               return _EmptyState(
                   onBrowse: () => context.go('/browse'), c: c);
             }
-            final query = _searchCtrl.text.trim().toLowerCase();
-            final filtered = query.isEmpty
-                ? mangas
-                : mangas
-                    .where((m) =>
-                        m.title.toLowerCase().contains(query))
-                    .toList();
             return _FilledState(
-              mangas: filtered,
+              mangas: mangas,
               totalCount: mangas.length,
               recentlyRead:
                   _searching ? const [] : (recentlyReadAsync.valueOrNull ?? const []),
@@ -230,7 +214,7 @@ class _EmptyState extends StatelessWidget {
 
 // ── Filled state ──────────────────────────────────────────────────────────────
 
-class _FilledState extends StatelessWidget {
+class _FilledState extends StatefulWidget {
   const _FilledState({
     required this.mangas,
     required this.totalCount,
@@ -256,7 +240,35 @@ class _FilledState extends StatelessWidget {
   final SheepColors c;
 
   @override
+  State<_FilledState> createState() => _FilledStateState();
+}
+
+class _FilledStateState extends State<_FilledState> {
+  @override
+  void initState() {
+    super.initState();
+    widget.searchCtrl.addListener(_onSearch);
+  }
+
+  void _onSearch() => setState(() {});
+
+  @override
+  void dispose() {
+    widget.searchCtrl.removeListener(_onSearch);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final c = widget.c;
+    final searching = widget.searching;
+    final searchCtrl = widget.searchCtrl;
+    final query = searchCtrl.text.trim().toLowerCase();
+    final mangas = query.isEmpty
+        ? widget.mangas
+        : widget.mangas
+            .where((m) => m.title.toLowerCase().contains(query))
+            .toList();
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +299,7 @@ class _FilledState extends StatelessWidget {
                     ),
                   ),
                   GestureDetector(
-                    onTap: onSearchToggle,
+                    onTap: widget.onSearchToggle,
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       width: 44,
@@ -329,7 +341,7 @@ class _FilledState extends StatelessWidget {
                     ),
                   ),
                   GestureDetector(
-                    onTap: onSearchToggle,
+                    onTap: widget.onSearchToggle,
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       width: 44,
@@ -363,7 +375,7 @@ class _FilledState extends StatelessWidget {
           ),
 
           // ── Continue Reading carousel ────────────────────────────────────
-          if (recentlyRead.isNotEmpty) ...[
+          if (widget.recentlyRead.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
               child: Text(
@@ -382,19 +394,19 @@ class _FilledState extends StatelessWidget {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                itemCount: recentlyRead.length,
+                itemCount: widget.recentlyRead.length,
                 itemBuilder: (context, i) {
-                  final entry = recentlyRead[i];
+                  final entry = widget.recentlyRead[i];
                   return Padding(
                     padding: EdgeInsets.only(
-                        right: i < recentlyRead.length - 1 ? 12 : 0),
+                        right: i < widget.recentlyRead.length - 1 ? 12 : 0),
                     child: SizedBox(
-                      width: recentlyRead.length == 1
+                      width: widget.recentlyRead.length == 1
                           ? MediaQuery.of(context).size.width - 40
                           : MediaQuery.of(context).size.width * 0.82,
                       child: _ContinueReadingCard(
                         entry: entry,
-                        onRead: () => onReadTap(entry.mangaId, entry.chapterId),
+                        onRead: () => widget.onReadTap(entry.mangaId, entry.chapterId),
                         c: c,
                       ),
                     ),
@@ -412,9 +424,9 @@ class _FilledState extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  searching && mangas.length < totalCount
-                      ? '${mangas.length} of $totalCount'
-                      : 'ALL · $totalCount',
+                  searching && mangas.length < widget.totalCount
+                      ? '${mangas.length} of ${widget.totalCount}'
+                      : 'ALL · ${widget.totalCount}',
                   style: TextStyle(
                     fontSize: 10,
                     height: 1,
@@ -451,10 +463,10 @@ class _FilledState extends StatelessWidget {
                   ),
                   itemCount: mangas.length,
                   itemBuilder: (context, i) => GestureDetector(
-                    onTap: () => onMangaTap(mangas[i].id),
+                    onTap: () => widget.onMangaTap(mangas[i].id),
                     child: _MangaCard(
                       manga: mangas[i],
-                      progress: progress[mangas[i].id],
+                      progress: widget.progress[mangas[i].id],
                       c: c,
                     ),
                   ),
@@ -698,10 +710,9 @@ class _CoverThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final file = coverPath.isNotEmpty ? File(coverPath) : null;
-    if (file != null && file.existsSync()) {
+    if (coverPath.isNotEmpty) {
       return Image.file(
-        file,
+        File(coverPath),
         width: width,
         height: height,
         fit: BoxFit.cover,

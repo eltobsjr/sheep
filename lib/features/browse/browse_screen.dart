@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:palette_generator/palette_generator.dart';
-
 import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
@@ -31,16 +29,27 @@ class BrowseScreen extends ConsumerWidget {
     final latestAsync = ref.watch(latestProvider);
 
     // Split sources: regular (scraper-based) vs web (requiresJavaScript)
-    final allFiltered = selectedLang == 'all'
+    final allFiltered = selectedLang == 'web'
         ? orderedIds
-        : orderedIds.where((id) {
-            final source = sourceById(id);
-            return source?.language == selectedLang;
-          }).toList();
-    final filteredIds =
-        allFiltered.where((id) => !(sourceById(id)?.requiresJavaScript ?? false)).toList();
-    final webSourceIds =
-        allFiltered.where((id) => sourceById(id)?.requiresJavaScript ?? false).toList();
+            .where((id) => sourceById(id)?.requiresJavaScript ?? false)
+            .toList()
+        : selectedLang == 'all'
+            ? orderedIds
+                .where((id) => !(sourceById(id)?.requiresJavaScript ?? false))
+                .toList()
+            : orderedIds
+                .where((id) {
+                  final s = sourceById(id);
+                  return s?.language == selectedLang &&
+                      !(s?.requiresJavaScript ?? false);
+                })
+                .toList();
+    // Web filter: web sources appear as chips. Other filters: only non-web in chips.
+    final filteredIds = selectedLang == 'web'
+        ? allFiltered
+        : allFiltered
+            .where((id) => !(sourceById(id)?.requiresJavaScript ?? false))
+            .toList();
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -105,6 +114,8 @@ class BrowseScreen extends ConsumerWidget {
                   selected: selectedLang,
                   onChanged: (lang) {
                     ref.read(selectedLanguageProvider.notifier).state = lang;
+                    // Web filter: no popular/latest, no need to update selectedSource.
+                    if (lang == 'web') return;
                     final candidates = lang == 'all'
                         ? orderedIds
                         : orderedIds.where(
@@ -148,12 +159,23 @@ class BrowseScreen extends ConsumerWidget {
                     if (source == null) {
                       return SizedBox.shrink(key: ValueKey(sourceId));
                     }
-                    final active = sourceId == selectedId;
+                    final isWebSource =
+                        source.requiresJavaScript;
+                    final active = !isWebSource && sourceId == selectedId;
                     final canDrag = selectedLang == 'all';
                     final chip = GestureDetector(
-                      onTap: () => ref
-                          .read(selectedSourceIdProvider.notifier)
-                          .state = sourceId,
+                      onTap: () {
+                        if (isWebSource) {
+                          context.push('/source-browser', extra: {
+                            'url': source.baseUrl,
+                            'name': source.name,
+                          });
+                        } else {
+                          ref
+                              .read(selectedSourceIdProvider.notifier)
+                              .state = sourceId;
+                        }
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -244,7 +266,20 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
+            // ── Web filter: hint when no native browse ───────────────────────
+            if (selectedLang == 'web')
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                  child: Text(
+                    'Toque numa fonte para abrir no browser integrado.',
+                    style: TextStyle(fontSize: 12, height: 1.4, color: c.slate),
+                  ),
+                ),
+              ),
+
             // ── Featured card ─────────────────────────────────────────────────
+            if (selectedLang != 'web')
             SliverToBoxAdapter(
               child: popularAsync.when(
                 loading: () => const SizedBox(
@@ -269,6 +304,7 @@ class BrowseScreen extends ConsumerWidget {
             ),
 
             // ── Popular section ───────────────────────────────────────────────
+            if (selectedLang != 'web')
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -284,6 +320,7 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
+            if (selectedLang != 'web')
             popularAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: Padding(
@@ -358,6 +395,7 @@ class BrowseScreen extends ConsumerWidget {
             ),
 
             // ── Recently updated section ──────────────────────────────────────
+            if (selectedLang != 'web')
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -373,6 +411,7 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
+            if (selectedLang != 'web')
             latestAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: SizedBox(height: 8),
@@ -393,81 +432,6 @@ class BrowseScreen extends ConsumerWidget {
                 ),
               ),
             ),
-
-            // ── Fontes Web section ────────────────────────────────────────────
-            if (webSourceIds.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-                  child: Text(
-                    'FONTES WEB',
-                    style: TextStyle(
-                      fontSize: 10,
-                      height: 1,
-                      letterSpacing: 10 * 0.08,
-                      color: c.slate,
-                    ),
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-                  child: Text(
-                    'Estas fontes requerem JavaScript e abrem no browser integrado.',
-                    style: TextStyle(fontSize: 11, height: 1.4, color: c.slate),
-                  ),
-                ),
-              ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final srcId = webSourceIds[i];
-                    final src = sourceById(srcId);
-                    if (src == null) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                      child: GestureDetector(
-                        onTap: () => context.push('/source-browser', extra: {
-                          'url': src.baseUrl,
-                          'name': src.name,
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: c.wool,
-                            borderRadius:
-                                BorderRadius.circular(radiusCard),
-                            border: Border.all(color: c.wool),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  src.name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                    color: c.ink,
-                                  ),
-                                ),
-                              ),
-                              Icon(
-                                Icons.open_in_browser_rounded,
-                                size: 16,
-                                color: c.slate,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  childCount: webSourceIds.length,
-                ),
-              ),
-            ],
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
@@ -507,7 +471,7 @@ Future<void> _onMangaTap(
 
 // ── Featured card ─────────────────────────────────────────────────────────────
 
-class _FeaturedCard extends StatefulWidget {
+class _FeaturedCard extends StatelessWidget {
   const _FeaturedCard({
     required this.manga,
     required this.sourceName,
@@ -518,56 +482,17 @@ class _FeaturedCard extends StatefulWidget {
   final String sourceName;
   final VoidCallback onTap;
 
-  @override
-  State<_FeaturedCard> createState() => _FeaturedCardState();
-}
-
-class _FeaturedCardState extends State<_FeaturedCard> {
-  static const _fallbackColors = [
+  static const _colors = [
     Color(0xFF1A1A2E), Color(0xFF5C3B1E), Color(0xFFCC2B2B), Color(0xFF1B2A4A),
     Color(0xFF8B1A1A), Color(0xFF2D6A4F), Color(0xFF6B3FA0), Color(0xFF2A3F5A),
   ];
 
-  Color? _dominantColor;
-
-  Color get _fallback =>
-      _fallbackColors[widget.manga.id.hashCode.abs() % _fallbackColors.length];
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.manga.coverUrl.isNotEmpty) _extractColor();
-  }
-
-  @override
-  void didUpdateWidget(_FeaturedCard old) {
-    super.didUpdateWidget(old);
-    if (old.manga.coverUrl != widget.manga.coverUrl) {
-      setState(() => _dominantColor = null);
-      if (widget.manga.coverUrl.isNotEmpty) _extractColor();
-    }
-  }
-
-  Future<void> _extractColor() async {
-    try {
-      final generator = await PaletteGenerator.fromImageProvider(
-        NetworkImage(widget.manga.coverUrl),
-        size: const Size(80, 120),
-        maximumColorCount: 8,
-      );
-      if (!mounted) return;
-      setState(() =>
-          _dominantColor = generator.darkMutedColor?.color ??
-              generator.dominantColor?.color);
-    } catch (_) {}
-  }
+  Color get _bg => _colors[manga.id.hashCode.abs() % _colors.length];
 
   @override
   Widget build(BuildContext context) {
-    final bg = _dominantColor ?? _fallback;
-
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radiusCard),
         child: SizedBox(
@@ -575,20 +500,14 @@ class _FeaturedCardState extends State<_FeaturedCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Dominant color background (animates in once extracted)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                color: bg,
-              ),
-              // Cover image
-              if (widget.manga.coverUrl.isNotEmpty)
+              ColoredBox(color: _bg),
+              if (manga.coverUrl.isNotEmpty)
                 _RemoteCover(
-                  url: widget.manga.coverUrl,
-                  fallbackColor: bg,
+                  url: manga.coverUrl,
+                  fallbackColor: _bg,
                   width: double.infinity,
                   height: 158,
                 ),
-              // Dark gradient overlay for text readability
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -598,12 +517,11 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                   ),
                 ),
               ),
-              // Watermark title (always shown at 8% opacity)
               Positioned(
                 right: -6,
                 bottom: -18,
                 child: Text(
-                  widget.manga.title.toUpperCase(),
+                  manga.title.toUpperCase(),
                   style: const TextStyle(
                     fontFamily: fontDisplay,
                     fontWeight: FontWeight.w700,
@@ -614,7 +532,6 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                   ),
                 ),
               ),
-              // Content overlay
               Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
@@ -624,39 +541,43 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 11, vertical: 5),
-                          decoration: const BoxDecoration(
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
                             color: Color(0x38000000),
                             borderRadius:
                                 BorderRadius.all(Radius.circular(radiusPill)),
                           ),
-                          child: const Text(
-                            'Ch. ∞',
-                            style: TextStyle(
-                              fontFamily: fontMono,
-                              fontSize: 11,
-                              height: 1,
-                              color: Color(0xFFFAFAFA),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 11, vertical: 5),
+                            child: Text(
+                              'Ch. ∞',
+                              style: TextStyle(
+                                fontFamily: fontMono,
+                                fontSize: 11,
+                                height: 1,
+                                color: Color(0xFFFAFAFA),
+                              ),
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 11, vertical: 5),
+                        DecoratedBox(
                           decoration: const BoxDecoration(
                             color: Color(0x38000000),
                             borderRadius:
                                 BorderRadius.all(Radius.circular(radiusPill)),
                           ),
-                          child: Text(
-                            widget.sourceName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 10,
-                              height: 1,
-                              color: Color(0xFFFAFAFA),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 11, vertical: 5),
+                            child: Text(
+                              sourceName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                                height: 1,
+                                color: Color(0xFFFAFAFA),
+                              ),
                             ),
                           ),
                         ),
@@ -666,7 +587,7 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.manga.title,
+                          manga.title,
                           style: const TextStyle(
                             fontFamily: fontDisplay,
                             fontWeight: FontWeight.w700,
@@ -677,10 +598,10 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (widget.manga.author.isNotEmpty) ...[
+                        if (manga.author.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            '${widget.manga.author} · Ongoing',
+                            '${manga.author} · Ongoing',
                             style: const TextStyle(
                               fontSize: 12,
                               height: 1,
@@ -869,6 +790,7 @@ class _LanguageDropdown extends StatelessWidget {
     ('all', 'All'),
     ('pt-br', 'PT-BR'),
     ('en', 'EN'),
+    ('web', 'Web'),
   ];
 
   String get _label =>

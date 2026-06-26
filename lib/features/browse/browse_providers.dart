@@ -75,6 +75,8 @@ final allSourcesResultsProvider =
       final items = await s.search(query, 1);
       return SourceSearchResult(source: s, items: items);
     } catch (e) {
+      // Web sources failing (e.g. CF not yet solved) show no error — just 0 results.
+      if (s.requiresJavaScript) return SourceSearchResult(source: s, items: const []);
       return SourceSearchResult(source: s, items: const [], error: e);
     }
   });

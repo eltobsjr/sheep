@@ -28,7 +28,6 @@ dependencies:
   wakelock_plus: ^1.2.10
   workmanager: ^0.9.0
   flutter_local_notifications: ^17.0.0
-  palette_generator: ^0.3.3
 
 dev_dependencies:
   flutter_test:

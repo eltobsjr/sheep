@@ -113,6 +113,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
     final needsJsAsync =
         ref.watch(readerSourceNeedsJsProvider(widget.chapterId));
+    final sourceInfoAsync =
+        ref.watch(readerSourceInfoProvider(widget.chapterId));
 
     return PopScope(
       child: Scaffold(
@@ -126,6 +128,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           isRtl: isRtl,
           nextChapterId: nextChapterId,
           needsJs: needsJsAsync.valueOrNull ?? false,
+          sourceInfo: sourceInfoAsync.valueOrNull,
         ),
       ),
     );
@@ -140,6 +143,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     required bool isRtl,
     String? nextChapterId,
     bool needsJs = false,
+    ({String name, String Function(String) browserUrl})? sourceInfo,
   }) {
     if (pagesAsync.isLoading || initialPageAsync.isLoading) {
       final loadingLabel =
@@ -206,10 +210,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     // Sources that require JavaScript to render pages cannot be scraped
     // directly. Show a prompt to open the chapter in the in-app browser.
     if (needsJs && pages.isEmpty && chapter != null) {
-      final sourceName = mangaTitle ?? 'esta fonte';
-      final chapterUrl = chapter.url.startsWith('http')
-          ? chapter.url
-          : 'https://mangafire.to/${chapter.url}';
+      final sourceName = sourceInfo?.name ?? mangaTitle ?? 'esta fonte';
+      final chapterUrl = sourceInfo?.browserUrl(chapter.url)
+          ?? (chapter.url.startsWith('http') ? chapter.url : 'about:blank');
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -235,7 +238,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               GestureDetector(
                 onTap: () => context.push(
                   '/source-browser',
-                  extra: {'url': chapterUrl, 'name': 'MangaFire'},
+                  extra: {'url': chapterUrl, 'name': sourceName},
                 ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(

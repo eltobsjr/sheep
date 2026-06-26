@@ -154,6 +154,8 @@ class _DetailBody extends ConsumerWidget {
         context.push('/source-browser', extra: {
           'url': source.chapterBrowserUrl(ch.url),
           'name': source.name,
+          'mangaId': mangaId,
+          'chapterId': ch.id,
         });
       } else {
         context.push('/reader/$mangaId/${ch.id}');
@@ -242,6 +244,8 @@ class _DetailBody extends ConsumerWidget {
                           height: 1.1,
                           color: Color(0xFFFAFAFA),
                         ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (author.isNotEmpty) ...[
                         const SizedBox(height: 6),

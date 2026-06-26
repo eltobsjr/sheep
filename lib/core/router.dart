@@ -77,10 +77,12 @@ final router = GoRouter(
     GoRoute(
       path: '/source-browser',
       builder: (context, state) {
-        final extra = state.extra as Map<String, String>;
+        final extra = state.extra as Map<String, dynamic>;
         return SourceBrowserScreen(
-          url: extra['url']!,
-          sourceName: extra['name']!,
+          url: extra['url'] as String,
+          sourceName: extra['name'] as String,
+          mangaId: extra['mangaId'] as String?,
+          chapterId: extra['chapterId'] as String?,
         );
       },
     ),

@@ -1,31 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/theme/tokens.dart';
+import '../../data/db/database_provider.dart';
 
 // Full-screen WebView browser for a single manga source.
 // Blocks all navigation outside the source domain and Cloudflare infrastructure.
 // Has back / forward / reload controls so the user can browse naturally.
-class SourceBrowserScreen extends StatefulWidget {
+//
+// When mangaId + chapterId are provided (opening a specific chapter), a
+// "Marcar como lido" button appears in the toolbar to track reading progress.
+class SourceBrowserScreen extends ConsumerStatefulWidget {
   const SourceBrowserScreen({
     super.key,
     required this.url,
     required this.sourceName,
+    this.mangaId,
+    this.chapterId,
   });
 
   final String url;
   final String sourceName;
+  final String? mangaId;
+  final String? chapterId;
 
   @override
-  State<SourceBrowserScreen> createState() => _SourceBrowserScreenState();
+  ConsumerState<SourceBrowserScreen> createState() =>
+      _SourceBrowserScreenState();
 }
 
-class _SourceBrowserScreenState extends State<SourceBrowserScreen> {
+class _SourceBrowserScreenState extends ConsumerState<SourceBrowserScreen> {
   late final WebViewController _controller;
   bool _canGoBack = false;
   bool _canGoForward = false;
   bool _loading = true;
+  bool _markedRead = false;
+
+  bool get _hasChapter =>
+      widget.mangaId != null && widget.chapterId != null;
 
   @override
   void initState() {
@@ -72,6 +87,13 @@ class _SourceBrowserScreenState extends State<SourceBrowserScreen> {
       return NavigationDecision.navigate;
     }
     return NavigationDecision.prevent;
+  }
+
+  Future<void> _markRead() async {
+    final chapterId = widget.chapterId;
+    if (chapterId == null) return;
+    await ref.read(databaseProvider).markChapterRead(chapterId, isRead: true);
+    if (mounted) setState(() => _markedRead = true);
   }
 
   @override
@@ -121,6 +143,50 @@ class _SourceBrowserScreenState extends State<SourceBrowserScreen> {
                       ),
                     ),
                   const SizedBox(width: 8),
+                  // Mark as read — only when opening a specific chapter
+                  if (_hasChapter)
+                    GestureDetector(
+                      onTap: _markedRead ? null : _markRead,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 0),
+                        decoration: BoxDecoration(
+                          color: _markedRead ? ink : wool,
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(radiusPill)),
+                        ),
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SvgPicture.string(
+                              _markedRead
+                                  ? '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"'
+                                      ' stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"'
+                                      ' stroke-linejoin="round"><path d="M1.5 5.5l3 3 5-5"/></svg>'
+                                  : '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"'
+                                      ' stroke="#6B6B6B" stroke-width="1.5" stroke-linecap="round"'
+                                      ' stroke-linejoin="round"><circle cx="5.5" cy="5.5" r="4"/>'
+                                      '<path d="M3.5 5.5l1.5 1.5 3-3"/></svg>',
+                              width: 11,
+                              height: 11,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              _markedRead ? 'Lido' : 'Marcar lido',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                                height: 1,
+                                color: _markedRead ? paper : slate,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   // Back
                   _NavButton(
                     icon: Icons.arrow_back_ios_new_rounded,
