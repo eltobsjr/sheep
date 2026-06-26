@@ -184,7 +184,7 @@ abstract class MadaraSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
+  Future<List<ChapterSummary>> getChapters(String mangaUrl, {String? lang}) async {
     // mangaUrl = slug — build full manga URL with /manga/ prefix
     final mangaPath = '/manga/$mangaUrl/';
     final chapterListUrl = useNewChapterEndpoint

@@ -131,10 +131,12 @@ class AppDatabase extends _$AppDatabase {
       (select(mangas)..where((m) => m.id.equals(mangaId)))
           .watchSingleOrNull();
 
-  Stream<List<Chapter>> watchChapters(String mangaId) =>
+  Stream<List<Chapter>> watchChapters(String mangaId, {bool ascending = false}) =>
       (select(chapters)
             ..where((c) => c.mangaId.equals(mangaId))
-            ..orderBy([(c) => OrderingTerm.desc(c.number)]))
+            ..orderBy([(c) => ascending
+                ? OrderingTerm.asc(c.number)
+                : OrderingTerm.desc(c.number)]))
           .watch();
 
   Future<void> toggleLibrary(String mangaId, {required bool inLibrary}) =>
@@ -147,6 +149,24 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertChapters(List<ChaptersCompanion> rows) async {
     if (rows.isEmpty) return;
     await batch((b) => b.insertAllOnConflictUpdate(chapters, rows));
+  }
+
+  // Replaces all chapters for a manga atomically — deletes existing rows
+  // (and their reading_progress) then inserts new ones.
+  // Used by sources with replaceChaptersOnRefetch=true (e.g. MangaFire).
+  Future<void> replaceChapters(
+      String mangaId, List<ChaptersCompanion> rows) async {
+    await transaction(() async {
+      await customStatement(
+        'DELETE FROM reading_progress WHERE chapter_id IN '
+        '(SELECT id FROM chapters WHERE manga_id = ?)',
+        [mangaId],
+      );
+      await (delete(chapters)..where((c) => c.mangaId.equals(mangaId))).go();
+      if (rows.isNotEmpty) {
+        await batch((b) => b.insertAll(chapters, rows));
+      }
+    });
   }
 
   Stream<Chapter?> watchChapterById(String chapterId) =>
@@ -369,19 +389,20 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<LastReadEntry>> watchRecentlyRead({int limit = 8}) {
     return customSelect(
       '''
+      WITH latest AS (
+        SELECT ch.manga_id, MAX(rp.updated_at) AS max_at
+        FROM reading_progress rp
+        INNER JOIN chapters ch ON ch.id = rp.chapter_id
+        GROUP BY ch.manga_id
+      )
       SELECT rp.chapter_id, rp.last_page,
              ch.title AS ch_title, ch.number AS ch_number, ch.page_count,
              m.id AS manga_id, m.title AS manga_title, m.cover_path
-      FROM reading_progress rp
-      INNER JOIN chapters ch ON ch.id = rp.chapter_id
-      INNER JOIN mangas m ON m.id = ch.manga_id
+      FROM latest
+      INNER JOIN chapters ch ON ch.manga_id = latest.manga_id
+      INNER JOIN reading_progress rp ON rp.chapter_id = ch.id AND rp.updated_at = latest.max_at
+      INNER JOIN mangas m ON m.id = latest.manga_id
       WHERE m.in_library = 1
-        AND rp.updated_at = (
-          SELECT MAX(rp2.updated_at)
-          FROM reading_progress rp2
-          INNER JOIN chapters ch2 ON ch2.id = rp2.chapter_id
-          WHERE ch2.manga_id = m.id
-        )
       ORDER BY rp.updated_at DESC
       LIMIT ?
       ''',

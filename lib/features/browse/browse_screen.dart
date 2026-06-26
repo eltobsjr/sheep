@@ -28,28 +28,20 @@ class BrowseScreen extends ConsumerWidget {
     final popularAsync = ref.watch(popularProvider);
     final latestAsync = ref.watch(latestProvider);
 
-    // Split sources: regular (scraper-based) vs web (requiresJavaScript)
-    final allFiltered = selectedLang == 'web'
+    // Split sources by language filter
+    final filteredIds = selectedLang == 'web'
         ? orderedIds
             .where((id) => sourceById(id)?.requiresJavaScript ?? false)
             .toList()
         : selectedLang == 'all'
             ? orderedIds
-                .where((id) => !(sourceById(id)?.requiresJavaScript ?? false))
-                .toList()
-            : orderedIds
-                .where((id) {
-                  final s = sourceById(id);
-                  return s?.language == selectedLang &&
-                      !(s?.requiresJavaScript ?? false);
-                })
-                .toList();
-    // Web filter: web sources appear as chips. Other filters: only non-web in chips.
-    final filteredIds = selectedLang == 'web'
-        ? allFiltered
-        : allFiltered
-            .where((id) => !(sourceById(id)?.requiresJavaScript ?? false))
-            .toList();
+            : selectedLang == 'multi'
+                ? orderedIds
+                    .where((id) => sourceById(id)?.language == 'multi')
+                    .toList()
+                : orderedIds
+                    .where((id) => sourceById(id)?.language == selectedLang)
+                    .toList();
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -114,17 +106,14 @@ class BrowseScreen extends ConsumerWidget {
                   selected: selectedLang,
                   onChanged: (lang) {
                     ref.read(selectedLanguageProvider.notifier).state = lang;
-                    // Web filter: no popular/latest, no need to update selectedSource.
-                    if (lang == 'web') return;
                     final candidates = lang == 'all'
                         ? orderedIds
-                        : orderedIds.where(
-                            (id) => sourceById(id)?.language == lang).toList();
-                    // Prefer non-web sources so popular/latest loads correctly.
-                    final first = candidates.firstWhere(
-                      (id) => !(sourceById(id)?.requiresJavaScript ?? false),
-                      orElse: () => candidates.firstOrNull ?? '',
-                    );
+                        : lang == 'multi'
+                            ? orderedIds.where(
+                                (id) => sourceById(id)?.language == 'multi').toList()
+                            : orderedIds.where(
+                                (id) => sourceById(id)?.language == lang).toList();
+                    final first = candidates.firstOrNull ?? '';
                     if (first.isNotEmpty) {
                       ref.read(selectedSourceIdProvider.notifier).state = first;
                     }
@@ -159,22 +148,13 @@ class BrowseScreen extends ConsumerWidget {
                     if (source == null) {
                       return SizedBox.shrink(key: ValueKey(sourceId));
                     }
-                    final isWebSource =
-                        source.requiresJavaScript;
-                    final active = !isWebSource && sourceId == selectedId;
+                    final active = sourceId == selectedId;
                     final canDrag = selectedLang == 'all';
                     final chip = GestureDetector(
                       onTap: () {
-                        if (isWebSource) {
-                          context.push('/source-browser', extra: {
-                            'url': source.baseUrl,
-                            'name': source.name,
-                          });
-                        } else {
-                          ref
-                              .read(selectedSourceIdProvider.notifier)
-                              .state = sourceId;
-                        }
+                        ref
+                            .read(selectedSourceIdProvider.notifier)
+                            .state = sourceId;
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -266,20 +246,7 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
-            // ── Web filter: hint when no native browse ───────────────────────
-            if (selectedLang == 'web')
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                  child: Text(
-                    'Toque numa fonte para abrir no browser integrado.',
-                    style: TextStyle(fontSize: 12, height: 1.4, color: c.slate),
-                  ),
-                ),
-              ),
-
             // ── Featured card ─────────────────────────────────────────────────
-            if (selectedLang != 'web')
             SliverToBoxAdapter(
               child: popularAsync.when(
                 loading: () => const SizedBox(
@@ -304,7 +271,6 @@ class BrowseScreen extends ConsumerWidget {
             ),
 
             // ── Popular section ───────────────────────────────────────────────
-            if (selectedLang != 'web')
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -320,7 +286,6 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
-            if (selectedLang != 'web')
             popularAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: Padding(
@@ -395,7 +360,6 @@ class BrowseScreen extends ConsumerWidget {
             ),
 
             // ── Recently updated section ──────────────────────────────────────
-            if (selectedLang != 'web')
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -411,7 +375,6 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
-            if (selectedLang != 'web')
             latestAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: SizedBox(height: 8),
@@ -790,6 +753,7 @@ class _LanguageDropdown extends StatelessWidget {
     ('all', 'All'),
     ('pt-br', 'PT-BR'),
     ('en', 'EN'),
+    ('multi', 'Multi'),
     ('web', 'Web'),
   ];
 

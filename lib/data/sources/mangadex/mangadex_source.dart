@@ -194,7 +194,7 @@ class MangaDexSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
+  Future<List<ChapterSummary>> getChapters(String mangaUrl, {String? lang}) async {
     final all = <ChapterSummary>[];
     var offset = 0;
 
@@ -202,7 +202,7 @@ class MangaDexSource extends HttpMangaSource {
       // Use raw query string for bracket params — Dio would percent-encode
       // `order[chapter]` → `order%5Bchapter%5D` which some API versions reject.
       final query = 'manga=${Uri.encodeQueryComponent(mangaUrl)}'
-          '&translatedLanguage[]=${Uri.encodeQueryComponent(lang)}'
+          '&translatedLanguage[]=${Uri.encodeQueryComponent(this.lang)}'
           '&order[chapter]=asc'
           '&limit=$_chapterBatch'
           '&offset=$offset';

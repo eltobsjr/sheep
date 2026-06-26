@@ -28,19 +28,23 @@ final mangaWatchProvider =
   return ref.watch(databaseProvider).watchManga(mangaId);
 });
 
-// Watches all chapters for a manga. Order follows chapterSort setting (desc = latest first).
+// Selected chapter language for multi-language sources, keyed by sourceId.
+final selectedChapterLangProvider =
+    StateProvider.autoDispose.family<String, String>((ref, sourceId) =>
+        sourceById(sourceId)?.supportedLanguages.firstOrNull ?? 'en');
+
+// Watches all chapters for a manga — SQL ORDER BY avoids Dart-side sort.
 final chaptersWatchProvider =
     StreamProvider.autoDispose.family<List<Chapter>, String>((ref, mangaId) {
   final sort = ref.watch(settingsProvider).chapterSort;
   return ref
       .watch(databaseProvider)
-      .watchChapters(mangaId)
-      .map((list) => sort == 'asc' ? list.reversed.toList() : list);
+      .watchChapters(mangaId, ascending: sort == 'asc');
 });
 
-// Fetches manga detail + chapters from source, saves to DB.
-// Called from the screen via ref.watch — triggers on first build.
-final fetchMangaDetailProvider =
+// Meta-only fetch (getDetails + cover download + upsertManga).
+// Does NOT include getChapters so lang changes don't retrigger cover download.
+final _fetchMangaMetaProvider =
     FutureProvider.autoDispose.family<void, String>((ref, mangaId) async {
   final db = ref.read(databaseProvider);
   final manga = await db.watchManga(mangaId).first;
@@ -50,7 +54,6 @@ final fetchMangaDetailProvider =
   if (source == null || manga.url == null) return;
 
   final details = await source.getDetails(manga.url!);
-  final chapterSummaries = await source.getChapters(manga.url!);
 
   // Download cover if not already saved
   String coverPath = manga.coverPath;
@@ -96,17 +99,45 @@ final fetchMangaDetailProvider =
       genres: Value(jsonEncode(details.genres)),
     ),
   );
+});
 
-  await db.upsertChapters(
-    chapterSummaries.map((ch) => ChaptersCompanion(
-          id: Value(ch.id),
-          mangaId: Value(mangaId),
-          title: Value(ch.title),
-          number: Value(ch.number),
-          url: Value(ch.url),
-          uploadedAt: Value(ch.uploadedAt),
-        )).toList(),
-  );
+// Fetches chapters from source, saves to DB. Re-runs when selected lang changes.
+final fetchMangaDetailProvider =
+    FutureProvider.autoDispose.family<void, String>((ref, mangaId) async {
+  // Ensure meta is fetched first (cover + details).
+  await ref.watch(_fetchMangaMetaProvider(mangaId).future);
+
+  final db = ref.read(databaseProvider);
+  final manga = await db.watchManga(mangaId).first;
+  if (manga == null) return;
+
+  final source = sourceById(manga.sourceId);
+  if (source == null || manga.url == null) return;
+
+  // For multi-language sources, watch the selected language.
+  String? lang;
+  if (source.supportedLanguages.isNotEmpty) {
+    lang = ref.watch(selectedChapterLangProvider(manga.sourceId));
+  }
+
+  final chapterSummaries = await source.getChapters(manga.url!, lang: lang);
+
+  final companions = chapterSummaries
+      .map((ch) => ChaptersCompanion(
+            id: Value(ch.id),
+            mangaId: Value(mangaId),
+            title: Value(ch.title),
+            number: Value(ch.number),
+            url: Value(ch.url),
+            uploadedAt: Value(ch.uploadedAt),
+          ))
+      .toList();
+
+  if (source.replaceChaptersOnRefetch) {
+    await db.replaceChapters(mangaId, companions);
+  } else {
+    await db.upsertChapters(companions);
+  }
 });
 
 // Toggles library membership for a manga.

@@ -126,9 +126,16 @@ class _DetailBody extends ConsumerWidget {
     final chapters = offlineOnly
         ? allChapters.where((ch) => ch.isDownloaded).toList()
         : allChapters;
-    // Always sort ascending by number to find first/continue chapter correctly.
-    final sortedAsc = [...allChapters]..sort((a, b) => a.number.compareTo(b.number));
-    final firstChapter = sortedAsc.isNotEmpty ? sortedAsc.first : null;
+
+    // chaptersWatchProvider already returns SQL-sorted data.
+    // chapterSort == 'asc': first = allChapters.first, last = allChapters.last
+    // chapterSort == 'desc': first = allChapters.last, last = allChapters.first
+    final firstChapter = allChapters.isNotEmpty
+        ? (chapterSort == 'asc' ? allChapters.first : allChapters.last)
+        : null;
+    final lastChapter = allChapters.isNotEmpty
+        ? (chapterSort == 'asc' ? allChapters.last : allChapters.first)
+        : null;
 
     // Determine the chapter to start/continue reading.
     final readMap =
@@ -138,9 +145,8 @@ class _DetailBody extends ConsumerWidget {
       (mx, ch) => (readMap[ch.id] == true && ch.number > mx) ? ch.number : mx,
     );
     final hasReadProgress = lastReadNum >= 0;
-    final lastChapter = sortedAsc.isNotEmpty ? sortedAsc.last : null;
     final continueChapter = hasReadProgress
-        ? sortedAsc.firstWhere(
+        ? (chapterSort == 'asc' ? allChapters : allChapters.reversed).firstWhere(
             (ch) => ch.number > lastReadNum && (readMap[ch.id] != true),
             orElse: () => lastChapter!,
           )
@@ -148,6 +154,10 @@ class _DetailBody extends ConsumerWidget {
 
     final source = sourceById(manga?.sourceId ?? '');
     final needsJs = source?.requiresJavaScript ?? false;
+    final langs = source?.supportedLanguages ?? const [];
+    final selectedLang = langs.isNotEmpty && source != null
+        ? ref.watch(selectedChapterLangProvider(source.id))
+        : null;
 
     void openChapter(Chapter ch) {
       if (needsJs && source != null) {
@@ -442,6 +452,44 @@ class _DetailBody extends ConsumerWidget {
                     ],
                   ),
                 ),
+
+                // ── Language selector (multi-language sources) ───────────────
+                if (langs.isNotEmpty && selectedLang != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: langs.map((l) {
+                        final isActive = l == selectedLang;
+                        return GestureDetector(
+                          onTap: () => ref
+                              .read(selectedChapterLangProvider(source!.id)
+                                  .notifier)
+                              .state = l,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isActive ? c.ink : c.wool,
+                              borderRadius:
+                                  BorderRadius.circular(radiusPill),
+                            ),
+                            child: Text(
+                              l.toUpperCase(),
+                              style: TextStyle(
+                                fontFamily: fontMono,
+                                fontSize: 11,
+                                height: 1,
+                                color: isActive ? c.paper : c.ink,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
 
                 // ── Chapters header ──────────────────────────────────────────
                 Container(

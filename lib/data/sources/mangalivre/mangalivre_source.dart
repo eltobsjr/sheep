@@ -203,7 +203,7 @@ class MangaLivreSource extends HttpMangaSource with SourceAuth {
   }
 
   @override
-  Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
+  Future<List<ChapterSummary>> getChapters(String mangaUrl, {String? lang}) async {
     final response = await client.get<dynamic>('/api/manga-by-slug/$mangaUrl');
     final d = response.data as Map<String, dynamic>;
     final mangaId = d['id'] as String;

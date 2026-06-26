@@ -97,7 +97,7 @@ class MangaFlixSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
+  Future<List<ChapterSummary>> getChapters(String mangaUrl, {String? lang}) async {
     final response = await client.get<dynamic>('/mangas/$mangaUrl');
     final body = response.data as Map<String, dynamic>;
     final data = body['data'] as Map<String, dynamic>;

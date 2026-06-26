@@ -21,10 +21,8 @@ final List<MangaSource> allSources = [
   TaiyoSource(),
 ];
 
-// Look up a source by its id.
-MangaSource? sourceById(String id) {
-  for (final source in allSources) {
-    if (source.id == id) return source;
-  }
-  return null;
-}
+final Map<String, MangaSource> _sourceMap = {
+  for (final s in allSources) s.id: s,
+};
+
+MangaSource? sourceById(String id) => _sourceMap[id];

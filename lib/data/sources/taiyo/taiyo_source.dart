@@ -248,7 +248,7 @@ class TaiyoSource extends HttpMangaSource {
   }
 
   @override
-  Future<List<ChapterSummary>> getChapters(String mangaUrl) async {
+  Future<List<ChapterSummary>> getChapters(String mangaUrl, {String? lang}) async {
     // mangaUrl = mediaId (UUID)
     final all = <ChapterSummary>[];
     var page = 1;

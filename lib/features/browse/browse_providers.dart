@@ -18,7 +18,7 @@ final popularProvider =
     FutureProvider.autoDispose<List<MangaSummary>>((ref) async {
   final sourceId = ref.watch(selectedSourceIdProvider);
   final source = sourceById(sourceId);
-  if (source == null || source.requiresJavaScript) return const [];
+  if (source == null) return const [];
   return source.getPopular(1);
 });
 
@@ -27,7 +27,7 @@ final latestProvider =
     FutureProvider.autoDispose<List<MangaSummary>>((ref) async {
   final sourceId = ref.watch(selectedSourceIdProvider);
   final source = sourceById(sourceId);
-  if (source == null || source.requiresJavaScript) return const [];
+  if (source == null) return const [];
   return source.getLatest(1);
 });
 

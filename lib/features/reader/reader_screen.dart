@@ -111,8 +111,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final nextChapterId = ref.watch(
       nextChapterIdProvider((widget.mangaId, widget.chapterId)),
     );
-    final needsJsAsync =
-        ref.watch(readerSourceNeedsJsProvider(widget.chapterId));
     final sourceInfoAsync =
         ref.watch(readerSourceInfoProvider(widget.chapterId));
 
@@ -127,7 +125,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           isScroll: isScroll,
           isRtl: isRtl,
           nextChapterId: nextChapterId,
-          needsJs: needsJsAsync.valueOrNull ?? false,
           sourceInfo: sourceInfoAsync.valueOrNull,
         ),
       ),
@@ -142,9 +139,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     required bool isScroll,
     required bool isRtl,
     String? nextChapterId,
-    bool needsJs = false,
-    ({String name, String Function(String) browserUrl})? sourceInfo,
+    ({bool needsJs, String name, String Function(String) browserUrl})? sourceInfo,
   }) {
+    final needsJs = sourceInfo?.needsJs ?? false;
     if (pagesAsync.isLoading || initialPageAsync.isLoading) {
       final loadingLabel =
           _chapterLabel(mangaTitle, chapterAsync.valueOrNull);
@@ -211,7 +208,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     // directly. Show a prompt to open the chapter in the in-app browser.
     if (needsJs && pages.isEmpty && chapter != null) {
       final sourceName = sourceInfo?.name ?? mangaTitle ?? 'esta fonte';
-      final chapterUrl = sourceInfo?.browserUrl(chapter.url)
+      final chapterUrl = sourceInfo?.browserUrl.call(chapter.url)
           ?? (chapter.url.startsWith('http') ? chapter.url : 'about:blank');
       return Center(
         child: Padding(
