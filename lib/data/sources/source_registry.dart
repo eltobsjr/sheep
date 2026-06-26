@@ -3,8 +3,6 @@ import 'manga_source.dart';
 import 'mangafire/mangafire_source.dart';
 import 'mangaflix/mangaflix_source.dart';
 import 'taiyo/taiyo_source.dart';
-import 'weebcentral/weeb_central_source.dart';
-
 final List<MangaSource> allSources = [
   // ── Madara (WordPress WP-Manga) — PT-BR ───────────────────────────────────
   MangaFlixSource(),
@@ -12,7 +10,6 @@ final List<MangaSource> allSources = [
   MangaLivreToSource(),
 
   // ── HTML scrapers — EN ────────────────────────────────────────────────────
-  WeebCentralSource(),
   MangaFireSource(),
 
   // ── Next.js tRPC — PT-BR ─────────────────────────────────────────────────
