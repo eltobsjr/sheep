@@ -30,13 +30,17 @@ class BrowseScreen extends ConsumerWidget {
     final popularAsync = ref.watch(popularProvider);
     final latestAsync = ref.watch(latestProvider);
 
-    // Filter source IDs by selected language
-    final filteredIds = selectedLang == 'all'
+    // Split sources: regular (scraper-based) vs web (requiresJavaScript)
+    final allFiltered = selectedLang == 'all'
         ? orderedIds
         : orderedIds.where((id) {
             final source = sourceById(id);
             return source?.language == selectedLang;
           }).toList();
+    final filteredIds =
+        allFiltered.where((id) => !(sourceById(id)?.requiresJavaScript ?? false)).toList();
+    final webSourceIds =
+        allFiltered.where((id) => sourceById(id)?.requiresJavaScript ?? false).toList();
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -101,13 +105,16 @@ class BrowseScreen extends ConsumerWidget {
                   selected: selectedLang,
                   onChanged: (lang) {
                     ref.read(selectedLanguageProvider.notifier).state = lang;
-                    final first = lang == 'all'
-                        ? orderedIds.firstOrNull
-                        : orderedIds.firstWhere(
-                            (id) => sourceById(id)?.language == lang,
-                            orElse: () => orderedIds.firstOrNull ?? '',
-                          );
-                    if (first != null && first.isNotEmpty) {
+                    final candidates = lang == 'all'
+                        ? orderedIds
+                        : orderedIds.where(
+                            (id) => sourceById(id)?.language == lang).toList();
+                    // Prefer non-web sources so popular/latest loads correctly.
+                    final first = candidates.firstWhere(
+                      (id) => !(sourceById(id)?.requiresJavaScript ?? false),
+                      orElse: () => candidates.firstOrNull ?? '',
+                    );
+                    if (first.isNotEmpty) {
                       ref.read(selectedSourceIdProvider.notifier).state = first;
                     }
                   },
@@ -386,6 +393,81 @@ class BrowseScreen extends ConsumerWidget {
                 ),
               ),
             ),
+
+            // ── Fontes Web section ────────────────────────────────────────────
+            if (webSourceIds.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                  child: Text(
+                    'FONTES WEB',
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1,
+                      letterSpacing: 10 * 0.08,
+                      color: c.slate,
+                    ),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                  child: Text(
+                    'Estas fontes requerem JavaScript e abrem no browser integrado.',
+                    style: TextStyle(fontSize: 11, height: 1.4, color: c.slate),
+                  ),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) {
+                    final srcId = webSourceIds[i];
+                    final src = sourceById(srcId);
+                    if (src == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: GestureDetector(
+                        onTap: () => context.push('/source-browser', extra: {
+                          'url': src.baseUrl,
+                          'name': src.name,
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: c.wool,
+                            borderRadius:
+                                BorderRadius.circular(radiusCard),
+                            border: Border.all(color: c.wool),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  src.name,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: c.ink,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.open_in_browser_rounded,
+                                size: 16,
+                                color: c.slate,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: webSourceIds.length,
+                ),
+              ),
+            ],
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],

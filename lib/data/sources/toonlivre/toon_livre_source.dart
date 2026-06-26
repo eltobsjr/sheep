@@ -28,6 +28,9 @@ class ToonLivreSource extends HttpMangaSource {
   String get language => 'pt-br';
 
   @override
+  bool get requiresJavaScript => true;
+
+  @override
   String get iconAsset => 'assets/svg/sources/toonlivre.svg';
 
   // Sec-Fetch-* headers are required for the Cloudflare-protected API

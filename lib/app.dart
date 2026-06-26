@@ -7,13 +7,11 @@ import 'core/router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/tokens.dart';
 import 'core/widgets/webview_bypass_sheet.dart';
-import 'core/widgets/webview_scraper_host.dart';
 import 'data/settings/settings_repository.dart';
 import 'data/sources/auth_service.dart';
 import 'data/sources/cloudflare_bypass.dart';
 import 'data/sources/http_manga_source.dart';
 import 'data/sources/source_registry.dart';
-import 'data/sources/webview_page_scraper.dart';
 
 class SheepApp extends ConsumerStatefulWidget {
   const SheepApp({super.key});
@@ -25,21 +23,18 @@ class SheepApp extends ConsumerStatefulWidget {
 class _SheepAppState extends ConsumerState<SheepApp> {
   StreamSubscription<CloudflareException>? _cfSub;
   StreamSubscription<AuthExpiredException>? _authSub;
-  StreamSubscription<ScrapeRequest>? _scraperSub;
 
   @override
   void initState() {
     super.initState();
     _cfSub = CloudflareBypassService.instance.challenges.listen(_onCFChallenge);
     _authSub = AuthService.instance.sessionExpired.listen(_onSessionExpired);
-    _scraperSub = WebViewPageScraper.instance.requests.listen(_onScrapeRequest);
   }
 
   @override
   void dispose() {
     _cfSub?.cancel();
     _authSub?.cancel();
-    _scraperSub?.cancel();
     super.dispose();
   }
 
@@ -64,31 +59,6 @@ class _SheepAppState extends ConsumerState<SheepApp> {
           cookieJar: source.cookieJar,
         ),
       );
-    });
-  }
-
-  void _onScrapeRequest(ScrapeRequest request) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final overlay = rootNavigatorKey.currentState?.overlay;
-      if (overlay == null) {
-        if (!request.completer.isCompleted) {
-          request.completer.complete(const []);
-        }
-        return;
-      }
-      late OverlayEntry entry;
-      entry = OverlayEntry(
-        builder: (_) => Offstage(
-          child: WebViewScraperHost(
-            request: request,
-            onDone: () {
-              WidgetsBinding.instance
-                  .addPostFrameCallback((_) => entry.remove());
-            },
-          ),
-        ),
-      );
-      overlay.insert(entry);
     });
   }
 

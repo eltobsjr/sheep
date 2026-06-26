@@ -13,6 +13,7 @@ import '../../data/db/app_database.dart';
 import '../../data/db/database_provider.dart';
 import '../../data/download/download_provider.dart';
 import '../../data/settings/settings_repository.dart';
+import '../../data/sources/source_registry.dart';
 import 'manga_detail_providers.dart';
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -144,6 +145,20 @@ class _DetailBody extends ConsumerWidget {
             orElse: () => lastChapter!,
           )
         : firstChapter;
+
+    final source = sourceById(manga?.sourceId ?? '');
+    final needsJs = source?.requiresJavaScript ?? false;
+
+    void openChapter(Chapter ch) {
+      if (needsJs && source != null) {
+        context.push('/source-browser', extra: {
+          'url': source.chapterBrowserUrl(ch.url),
+          'name': source.name,
+        });
+      } else {
+        context.push('/reader/$mangaId/${ch.id}');
+      }
+    }
 
     final topPad = MediaQuery.of(context).padding.top;
     final isLoading = fetchAsync.isLoading && allChapters.isEmpty;
@@ -393,9 +408,7 @@ class _DetailBody extends ConsumerWidget {
                         child: GestureDetector(
                           onTap: continueChapter == null
                               ? null
-                              : () => context.push(
-                                    '/reader/$mangaId/${continueChapter.id}',
-                                  ),
+                              : () => openChapter(continueChapter),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
@@ -569,8 +582,8 @@ class _DetailBody extends ConsumerWidget {
                   ...chapters.map((ch) => _ChapterRow(
                         chapter: ch,
                         isRead: readMap[ch.id] ?? false,
-                        onTap: () => context.push('/reader/$mangaId/${ch.id}'),
-                        onDownload: ch.isDownloaded
+                        onTap: () => openChapter(ch),
+                        onDownload: (needsJs || ch.isDownloaded)
                             ? null
                             : () => ref
                                 .read(downloadServiceProvider)

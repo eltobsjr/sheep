@@ -11,8 +11,12 @@ abstract class MangaSource {
   String get language => 'en';
 
   // Sources that require JavaScript to render chapter pages set this to true.
-  // When true, the reader falls back to the in-app Source Browser WebView.
+  // When true, chapter taps open Source Browser instead of the native reader.
   bool get requiresJavaScript => false;
+
+  // Returns the web URL for a chapter to open in Source Browser.
+  // Override in sources with requiresJavaScript=true to provide the chapter URL.
+  String chapterBrowserUrl(String chapterUrl) => baseUrl;
 
   Future<List<MangaSummary>> getPopular(int page);
   Future<List<MangaSummary>> getLatest(int page);
