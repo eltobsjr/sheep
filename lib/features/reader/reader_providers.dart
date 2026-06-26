@@ -25,7 +25,8 @@ final readerPagesProvider =
   if (manga == null) throw Exception('Manga ${chapter.mangaId} not found');
 
   final dataSaver = settings.imageQuality == 'low';
-  final pageSource = _resolvePageSource(chapter, manga.sourceId, dataSaver);
+  final pageSource =
+      await _resolvePageSource(chapter, manga.sourceId, dataSaver, db);
   return pageSource.getPages();
 });
 
@@ -68,11 +69,13 @@ final nextChapterIdProvider =
   },
 );
 
-PageSource _resolvePageSource(
-    Chapter chapter, String sourceId, bool dataSaver) {
+Future<PageSource> _resolvePageSource(
+    Chapter chapter, String sourceId, bool dataSaver, AppDatabase db) async {
   if (chapter.isDownloaded && chapter.localPath != null) {
     final dir = Directory(chapter.localPath!);
     if (dir.existsSync()) return LocalPageSource(dir);
+    // Folder gone — reset stale flag so UI reflects reality.
+    await db.resetChapterDownload(chapter.id);
   }
   final source = sourceById(sourceId);
   if (source == null) throw Exception('Source $sourceId not found');

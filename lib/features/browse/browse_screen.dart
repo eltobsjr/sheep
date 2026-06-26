@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:palette_generator/palette_generator.dart';
+
 import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
@@ -405,7 +407,7 @@ Future<void> _onMangaTap(
 
 // ── Featured card ─────────────────────────────────────────────────────────────
 
-class _FeaturedCard extends StatelessWidget {
+class _FeaturedCard extends StatefulWidget {
   const _FeaturedCard({
     required this.manga,
     required this.sourceName,
@@ -416,17 +418,56 @@ class _FeaturedCard extends StatelessWidget {
   final String sourceName;
   final VoidCallback onTap;
 
-  static const _colors = [
+  @override
+  State<_FeaturedCard> createState() => _FeaturedCardState();
+}
+
+class _FeaturedCardState extends State<_FeaturedCard> {
+  static const _fallbackColors = [
     Color(0xFF1A1A2E), Color(0xFF5C3B1E), Color(0xFFCC2B2B), Color(0xFF1B2A4A),
     Color(0xFF8B1A1A), Color(0xFF2D6A4F), Color(0xFF6B3FA0), Color(0xFF2A3F5A),
   ];
 
-  Color get _color => _colors[manga.id.hashCode.abs() % _colors.length];
+  Color? _dominantColor;
+
+  Color get _fallback =>
+      _fallbackColors[widget.manga.id.hashCode.abs() % _fallbackColors.length];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.manga.coverUrl.isNotEmpty) _extractColor();
+  }
+
+  @override
+  void didUpdateWidget(_FeaturedCard old) {
+    super.didUpdateWidget(old);
+    if (old.manga.coverUrl != widget.manga.coverUrl) {
+      setState(() => _dominantColor = null);
+      if (widget.manga.coverUrl.isNotEmpty) _extractColor();
+    }
+  }
+
+  Future<void> _extractColor() async {
+    try {
+      final generator = await PaletteGenerator.fromImageProvider(
+        NetworkImage(widget.manga.coverUrl),
+        size: const Size(80, 120),
+        maximumColorCount: 8,
+      );
+      if (!mounted) return;
+      setState(() =>
+          _dominantColor = generator.darkMutedColor?.color ??
+              generator.dominantColor?.color);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bg = _dominantColor ?? _fallback;
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radiusCard),
         child: SizedBox(
@@ -434,13 +475,19 @@ class _FeaturedCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background: cover image or colored fallback
-              _RemoteCover(
-                url: manga.coverUrl,
-                fallbackColor: _color,
-                width: double.infinity,
-                height: 158,
+              // Dominant color background (animates in once extracted)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                color: bg,
               ),
+              // Cover image
+              if (widget.manga.coverUrl.isNotEmpty)
+                _RemoteCover(
+                  url: widget.manga.coverUrl,
+                  fallbackColor: bg,
+                  width: double.infinity,
+                  height: 158,
+                ),
               // Dark gradient overlay for text readability
               const DecoratedBox(
                 decoration: BoxDecoration(
@@ -451,23 +498,22 @@ class _FeaturedCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // Watermark title (only when no cover)
-              if (manga.coverUrl.isEmpty)
-                Positioned(
-                  right: -6,
-                  bottom: -18,
-                  child: Text(
-                    manga.title.toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: fontDisplay,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 72,
-                      height: 1,
-                      letterSpacing: 72 * -0.02,
-                      color: Color(0x140A0A0A),
-                    ),
+              // Watermark title (always shown at 8% opacity)
+              Positioned(
+                right: -6,
+                bottom: -18,
+                child: Text(
+                  widget.manga.title.toUpperCase(),
+                  style: const TextStyle(
+                    fontFamily: fontDisplay,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 72,
+                    height: 1,
+                    letterSpacing: 72 * -0.02,
+                    color: Color(0x14FAFAFA),
                   ),
                 ),
+              ),
               // Content overlay
               Padding(
                 padding: const EdgeInsets.all(14),
@@ -480,7 +526,7 @@ class _FeaturedCard extends StatelessWidget {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 11, vertical: 5),
+                              horizontal: 11, vertical: 5),
                           decoration: const BoxDecoration(
                             color: Color(0x38000000),
                             borderRadius:
@@ -498,14 +544,14 @@ class _FeaturedCard extends StatelessWidget {
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 11, vertical: 5),
+                              horizontal: 11, vertical: 5),
                           decoration: const BoxDecoration(
                             color: Color(0x38000000),
                             borderRadius:
                                 BorderRadius.all(Radius.circular(radiusPill)),
                           ),
                           child: Text(
-                            sourceName,
+                            widget.sourceName,
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 10,
@@ -520,7 +566,7 @@ class _FeaturedCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          manga.title,
+                          widget.manga.title,
                           style: const TextStyle(
                             fontFamily: fontDisplay,
                             fontWeight: FontWeight.w700,
@@ -531,10 +577,10 @@ class _FeaturedCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (manga.author.isNotEmpty) ...[
+                        if (widget.manga.author.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            '${manga.author} · Ongoing',
+                            '${widget.manga.author} · Ongoing',
                             style: const TextStyle(
                               fontSize: 12,
                               height: 1,

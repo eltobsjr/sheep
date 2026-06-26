@@ -333,6 +333,15 @@ class AppDatabase extends _$AppDatabase {
   Future<void> cancelDownload(String chapterId) =>
       (delete(downloadQueue)..where((d) => d.chapterId.equals(chapterId))).go();
 
+  // Clears isDownloaded/localPath when the folder was deleted externally.
+  Future<void> resetChapterDownload(String chapterId) =>
+      (update(chapters)..where((c) => c.id.equals(chapterId))).write(
+        const ChaptersCompanion(
+          isDownloaded: Value(false),
+          localPath: Value(null),
+        ),
+      );
+
   Future<void> markDownloadFailed(String chapterId) async {
     final row = await (select(downloadQueue)
           ..where((d) => d.chapterId.equals(chapterId)))
