@@ -148,11 +148,9 @@ class BrowseScreen extends ConsumerWidget {
                           .read(selectedSourceIdProvider.notifier)
                           .state = sourceId,
                       child: Container(
-                        padding: EdgeInsets.only(
-                          left: 14,
-                          right: active ? 6 : 14,
-                          top: 7,
-                          bottom: 7,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
                         ),
                         decoration: BoxDecoration(
                           color: active ? c.ink : c.wool,
@@ -183,32 +181,6 @@ class BrowseScreen extends ConsumerWidget {
                                 color: active ? c.paper : c.slate,
                               ),
                             ),
-                            if (active) ...[
-                              const SizedBox(width: 6),
-                              GestureDetector(
-                                onTap: () => context.push(
-                                  '/source-browser',
-                                  extra: {
-                                    'url': source.baseUrl,
-                                    'name': source.name,
-                                  },
-                                ),
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: c.paper.withOpacity(0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.open_in_browser_rounded,
-                                    size: 11,
-                                    color: c.paper,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -228,7 +200,42 @@ class BrowseScreen extends ConsumerWidget {
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            // ── "Visit source" link ───────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+                child: GestureDetector(
+                  onTap: () {
+                    final source = sourceById(selectedId);
+                    if (source == null) return;
+                    context.push('/source-browser', extra: {
+                      'url': source.baseUrl,
+                      'name': source.name,
+                    });
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.open_in_browser_rounded,
+                        size: 12,
+                        color: c.slate,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Visitar ${sourceById(selectedId)?.name ?? ''} no browser integrado',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1,
+                          color: c.slate,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
             // ── Featured card ─────────────────────────────────────────────────
             SliverToBoxAdapter(

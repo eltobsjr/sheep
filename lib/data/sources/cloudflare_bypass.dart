@@ -54,10 +54,14 @@ class CloudflareBypassService {
 // Dio interceptor added to every HttpMangaSource client.
 // Detects Cloudflare challenges, routes them through CloudflareBypassService,
 // and retries the original request after the user solves the challenge.
+//
+// Uses baseUrl (not the AJAX endpoint) when opening the WebView so the user
+// sees an HTML page with the Turnstile widget, not a raw JSON 403 response.
 class CloudflareInterceptor extends Interceptor {
-  CloudflareInterceptor(this.sourceId, this._dio);
+  CloudflareInterceptor(this.sourceId, this.baseUrl, this._dio);
 
   final String sourceId;
+  final String baseUrl;
   final Dio _dio;
 
   static const _retryKey = '_cf_retried';
@@ -74,13 +78,12 @@ class CloudflareInterceptor extends Interceptor {
     final status = err.response?.statusCode;
     if (status == 403 || status == 503) {
       final body = err.response?.data?.toString() ?? '';
-      if (_isCloudflarePage(body)) {
-        final url = err.requestOptions.uri.toString();
+      if (_isCloudflarePage(body, err)) {
         CloudflareBypassService.instance._emit(
-          CloudflareException(url: url, sourceId: sourceId),
+          CloudflareException(url: baseUrl, sourceId: sourceId),
         );
         try {
-          await CloudflareBypassService.instance.waitForBypass(url);
+          await CloudflareBypassService.instance.waitForBypass(baseUrl);
           // Mark as retried so we don't loop if CF still blocks.
           err.requestOptions.extra[_retryKey] = true;
           final response = await _dio.fetch<dynamic>(err.requestOptions);
@@ -94,11 +97,17 @@ class CloudflareInterceptor extends Interceptor {
     handler.next(err);
   }
 
-  bool _isCloudflarePage(String body) =>
-      body.contains('cf-browser-verification') ||
-      body.contains('cf_clearance') ||
-      body.contains('Just a moment') ||
-      body.contains('Checking your browser') ||
-      body.contains('cf-turnstile') ||
-      body.contains('challenges.cloudflare.com');
+  bool _isCloudflarePage(String body, DioException err) {
+    // Detect CF HTML challenge pages.
+    if (body.contains('cf-browser-verification') ||
+        body.contains('cf_clearance') ||
+        body.contains('Just a moment') ||
+        body.contains('Checking your browser') ||
+        body.contains('cf-turnstile') ||
+        body.contains('challenges.cloudflare.com')) return true;
+    // Detect CF-protected API endpoints: body is JSON/empty but CF-Ray header
+    // is always present on any response routed through Cloudflare.
+    final cfRay = err.response?.headers.value('cf-ray') ?? '';
+    return cfRay.isNotEmpty;
+  }
 }
