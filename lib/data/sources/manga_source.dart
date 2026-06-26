@@ -10,6 +10,10 @@ abstract class MangaSource {
   // ISO 639-1 language code: 'pt-br', 'en', etc.
   String get language => 'en';
 
+  // Sources that require JavaScript to render chapter pages set this to true.
+  // When true, the reader falls back to the in-app Source Browser WebView.
+  bool get requiresJavaScript => false;
+
   Future<List<MangaSummary>> getPopular(int page);
   Future<List<MangaSummary>> getLatest(int page);
   Future<List<MangaSummary>> search(String query, int page);

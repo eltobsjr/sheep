@@ -36,24 +36,54 @@ final latestProvider =
 final searchQueryProvider = StateProvider<String>((ref) => '');
 final searchSourceIdProvider = StateProvider<String?>((ref) => null); // null = all
 
+// Single-source search result list.
 final searchResultsProvider =
     FutureProvider.autoDispose<List<MangaSummary>>((ref) async {
   final query = ref.watch(searchQueryProvider);
   if (query.trim().isEmpty) return const [];
-
   final sourceId = ref.watch(searchSourceIdProvider);
+  if (sourceId == null) return const [];
+  final source = sourceById(sourceId);
+  if (source == null) return const [];
+  return source.search(query, 1);
+});
 
-  if (sourceId != null) {
-    // Single source search
-    final source = sourceById(sourceId);
-    if (source == null) return const [];
-    return source.search(query, 1);
-  }
+// Per-source result bucket for "All sources" mode.
+class SourceSearchResult {
+  const SourceSearchResult({
+    required this.source,
+    required this.items,
+    this.error,
+  });
 
-  // All sources — run in parallel, collect results
-  final futures = allSources.map((s) => s.search(query, 1).catchError((_) => <MangaSummary>[]));
+  final MangaSource source;
+  final List<MangaSummary> items;
+  final Object? error;
+
+  bool get hasError => error != null;
+}
+
+// All-sources search — runs each source in parallel, returns grouped results.
+// Successful sources come first (sorted by order), then failed ones at the end.
+final allSourcesResultsProvider =
+    FutureProvider.autoDispose<List<SourceSearchResult>>((ref) async {
+  final query = ref.watch(searchQueryProvider);
+  if (query.trim().isEmpty) return const [];
+
+  final futures = allSources.map((s) async {
+    try {
+      final items = await s.search(query, 1);
+      return SourceSearchResult(source: s, items: items);
+    } catch (e) {
+      return SourceSearchResult(source: s, items: const [], error: e);
+    }
+  });
+
   final results = await Future.wait(futures);
-  return results.expand((r) => r).toList();
+  final ok = results.where((r) => !r.hasError && r.items.isNotEmpty).toList();
+  final empty = results.where((r) => !r.hasError && r.items.isEmpty).toList();
+  final failed = results.where((r) => r.hasError).toList();
+  return [...ok, ...empty, ...failed];
 });
 
 // All sources for display in chips.

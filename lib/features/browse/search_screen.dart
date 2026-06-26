@@ -50,8 +50,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedSourceId = ref.watch(searchSourceIdProvider);
-    final resultsAsync = ref.watch(searchResultsProvider);
     final query = ref.watch(searchQueryProvider);
+    final isAllSources = selectedSourceId == null;
 
     return Scaffold(
       backgroundColor: paper,
@@ -64,7 +64,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
                 children: [
-                  // Pill search field
                   Expanded(
                     child: Container(
                       height: 44,
@@ -160,7 +159,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                 children: [
-                  // "All Sources"
                   GestureDetector(
                     onTap: () =>
                         ref.read(searchSourceIdProvider.notifier).state = null,
@@ -171,7 +169,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: selectedSourceId == null ? ink : wool,
+                        color: isAllSources ? ink : wool,
                         borderRadius: const BorderRadius.all(
                           Radius.circular(radiusPill),
                         ),
@@ -182,7 +180,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           fontWeight: FontWeight.w600,
                           fontSize: 11,
                           height: 1,
-                          color: selectedSourceId == null ? paper : slate,
+                          color: isAllSources ? paper : slate,
                         ),
                       ),
                     ),
@@ -223,22 +221,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             Expanded(
               child: query.isEmpty
                   ? const _EmptySearch()
-                  : resultsAsync.when(
-                      loading: () =>
-                          const Center(child: WoolLoading(size: 80)),
-                      error: (e, _) => Center(
-                        child: Text(
-                          'Erro: ${e.toString().split('\n').first}',
-                          style:
-                              const TextStyle(fontSize: 13, color: slate),
+                  : isAllSources
+                      ? _AllSourcesResults(
+                          onTap: (manga) => unawaited(
+                              _onResultTap(context, ref, manga)),
+                        )
+                      : _SingleSourceResults(
+                          onTap: (manga) => unawaited(
+                              _onResultTap(context, ref, manga)),
                         ),
-                      ),
-                      data: (items) => _ResultsList(
-                        items: items,
-                        onTap: (manga) =>
-                            unawaited(_onResultTap(context, ref, manga)),
-                      ),
-                    ),
             ),
           ],
         ),
@@ -258,6 +249,168 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           url: manga.url,
         );
     if (context.mounted) unawaited(context.push('/manga/${manga.id}'));
+  }
+}
+
+// ── All-sources results (grouped by source) ───────────────────────────────────
+
+class _AllSourcesResults extends ConsumerWidget {
+  const _AllSourcesResults({required this.onTap});
+
+  final void Function(MangaSummary) onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(allSourcesResultsProvider);
+    return async.when(
+      loading: () => const Center(child: WoolLoading(size: 80)),
+      error: (e, _) => Center(
+        child: Text(
+          e.toString().split('\n').first,
+          style: const TextStyle(fontSize: 13, color: slate),
+        ),
+      ),
+      data: (buckets) {
+        final hasAny = buckets.any((b) => b.items.isNotEmpty);
+        if (!hasAny && buckets.every((b) => !b.hasError)) {
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: Text(
+              'No results found',
+              style: TextStyle(fontSize: 14, height: 1.5, color: slate),
+            ),
+          );
+        }
+        return ListView.builder(
+          itemCount: buckets.length,
+          itemBuilder: (context, i) {
+            final bucket = buckets[i];
+            if (bucket.items.isEmpty && !bucket.hasError) {
+              return const SizedBox.shrink();
+            }
+            return _SourceBucket(bucket: bucket, onTap: onTap);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SourceBucket extends StatelessWidget {
+  const _SourceBucket({required this.bucket, required this.onTap});
+
+  final SourceSearchResult bucket;
+  final void Function(MangaSummary) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Source header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+          child: Row(
+            children: [
+              Text(
+                bucket.source.name.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 10,
+                  height: 1,
+                  letterSpacing: 10 * 0.08,
+                  fontWeight: FontWeight.w600,
+                  color: slate,
+                ),
+              ),
+              if (bucket.hasError) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0x14CC2B2B),
+                    borderRadius:
+                        const BorderRadius.all(Radius.circular(radiusPill)),
+                  ),
+                  child: Text(
+                    _errorLabel(bucket.error!),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      height: 1,
+                      color: Color(0xFFCC2B2B),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // Results or error explanation
+        if (bucket.hasError)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(
+              _errorDetail(bucket.error!),
+              style: const TextStyle(fontSize: 12, height: 1.4, color: slate),
+            ),
+          )
+        else
+          ...bucket.items.map(
+            (m) => _ResultRow(manga: m, onTap: () => onTap(m)),
+          ),
+      ],
+    );
+  }
+
+  static String _errorLabel(Object e) {
+    final msg = e.toString();
+    if (msg.contains('403') || msg.contains('503')) return 'bloqueado';
+    if (msg.contains('404')) return 'indisponível';
+    if (msg.contains('timeout') || msg.contains('TimeoutException')) {
+      return 'timeout';
+    }
+    if (msg.contains('SocketException') || msg.contains('connection')) {
+      return 'sem conexão';
+    }
+    return 'erro';
+  }
+
+  static String _errorDetail(Object e) {
+    final msg = e.toString();
+    if (msg.contains('403') || msg.contains('503')) {
+      return 'Esta fonte requer verificação de segurança (Cloudflare). Acesse-a individualmente para resolver o desafio.';
+    }
+    if (msg.contains('404')) return 'Fonte não encontrada ou indisponível.';
+    if (msg.contains('timeout') || msg.contains('TimeoutException')) {
+      return 'Tempo limite excedido ao conectar à fonte.';
+    }
+    if (msg.contains('SocketException') || msg.contains('connection')) {
+      return 'Sem conexão com a internet.';
+    }
+    return msg.split('\n').first;
+  }
+}
+
+// ── Single-source results ─────────────────────────────────────────────────────
+
+class _SingleSourceResults extends ConsumerWidget {
+  const _SingleSourceResults({required this.onTap});
+
+  final void Function(MangaSummary) onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(searchResultsProvider);
+    return async.when(
+      loading: () => const Center(child: WoolLoading(size: 80)),
+      error: (e, _) => Center(
+        child: Text(
+          'Erro: ${e.toString().split('\n').first}',
+          style: const TextStyle(fontSize: 13, color: slate),
+        ),
+      ),
+      data: (items) => _ResultsList(items: items, onTap: onTap),
+    );
   }
 }
 
@@ -301,7 +454,6 @@ class _ResultsList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // "N RESULTS" label
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
           child: Text(
@@ -364,7 +516,6 @@ class _ResultRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cover: 52×70
             Container(
               width: 52,
               height: 70,
@@ -374,7 +525,6 @@ class _ResultRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

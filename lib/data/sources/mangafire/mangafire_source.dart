@@ -5,13 +5,15 @@ import '../../../domain/models/chapter.dart';
 import '../../../domain/models/manga.dart';
 import '../http_manga_source.dart';
 
-// HTML scraper + AJAX for https://mangafire.to (EN)
-// Ported from keiyoushi/extensions-source src/en/mangafire
+// HTML scraper for https://mangafire.to (EN)
 //
-// Chapter list:  GET /ajax/manga/{slug}/chapter/en
-//   Response:    JSON { "result": "<li data-id='...'><a href='/read/...'>" }
-// Chapter pages: GET /ajax/read/{chapterId}
-//   Response:    JSON { "result": { "images": [["url", pageNum, ""], ...] } }
+// Chapter list:  GET /ajax/manga/{hid}/chapter/en
+//   Response:    JSON { "result": "<li data-number='...'><a href='/read/...'>" }
+// Chapter pages: requires JavaScript VRF token — not scraped directly.
+//   Instead, requiresJavaScript=true sends the reader to the Source Browser WebView.
+//
+// chapter.url stores the full reader path: "/read/{slug}.{hid}/en/chapter-{number}"
+// so the Source Browser can open the exact chapter page.
 //
 // ID format: the manga slug WITHOUT the /manga/ prefix.
 //   e.g. "one-piece.lp7ke" (not "/manga/one-piece.lp7ke")
@@ -28,6 +30,9 @@ class MangaFireSource extends HttpMangaSource {
 
   @override
   String get iconAsset => 'assets/svg/sources/mangafire.svg';
+
+  @override
+  bool get requiresJavaScript => true;
 
   @override
   Map<String, String> get defaultHeaders => {
@@ -180,23 +185,27 @@ class MangaFireSource extends HttpMangaSource {
     if (items.isEmpty) items = doc.querySelectorAll('li');
 
     for (final li in items) {
-      final chId = li.attributes['data-id'];
       final a = li.querySelector('a');
       final href = a?.attributes['href'] ?? '';
-      if (chId == null && href.isEmpty) continue;
-      final chapterRef = chId ?? href.split('/').last;
-      if (chapterRef.isEmpty) continue;
+      // href = "/read/one-piecee.dkw/en/chapter-1186"
+      if (href.isEmpty) continue;
+      // chapter number from data-number attribute or from href
+      final dataNumber = li.attributes['data-number'] ?? '';
+      final numMatch = dataNumber.isNotEmpty
+          ? RegExp(r'\d+\.?\d*').firstMatch(dataNumber)
+          : RegExp(r'chapter-(\d+\.?\d*)').firstMatch(href);
+      final number = double.tryParse(numMatch?.group(1) ?? numMatch?.group(0) ?? '') ?? 0.0;
       final rawTitle = a?.querySelector('.name')?.text.trim() ??
           a?.text.trim() ?? '';
-      final numMatch = RegExp(r'\d+\.?\d*').firstMatch(rawTitle);
-      final number = double.tryParse(numMatch?.group(0) ?? '') ?? 0.0;
+      // Use href as chapter URL so Source Browser can open the exact page
+      final chapterId = href.replaceFirst(RegExp(r'^/'), '');
       chapters.add(ChapterSummary(
-        id: chapterRef,
+        id: chapterId,
         title: rawTitle.isNotEmpty
             ? rawTitle
-            : 'Chapter ${numMatch?.group(0) ?? '?'}',
+            : 'Chapter ${dataNumber.isNotEmpty ? dataNumber : number.toStringAsFixed(0)}',
         number: number,
-        url: chapterRef,
+        url: chapterId,
       ));
     }
 
@@ -204,35 +213,12 @@ class MangaFireSource extends HttpMangaSource {
     return chapters.reversed.toList();
   }
 
+  // MangaFire's reader pages endpoint requires a time-based VRF token generated
+  // by obfuscated JavaScript — it cannot be replicated in Dart.
+  // requiresJavaScript=true causes the reader to open this source in the in-app
+  // WebView browser instead. chapterUrl already contains the full reader path
+  // (e.g. "read/one-piecee.dkw/en/chapter-1186") for the WebView to navigate to.
   @override
   Future<List<String>> getPages(String chapterUrl,
-      {bool dataSaver = false}) async {
-    final response = await client.get<dynamic>(
-      '/ajax/read/$chapterUrl',
-      options: Options(headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json, */*',
-      }),
-    );
-    final body = response.data as Map<String, dynamic>;
-    final result = body['result'];
-    if (result == null) return const [];
-    final resultMap = result as Map<String, dynamic>;
-    final images = resultMap['images'] as List<dynamic>? ?? const [];
-    // Each entry may be [url, pageNum, ""] or {"url": "...", "page": 1}
-    return images.map((img) {
-      final String rawUrl;
-      if (img is List<dynamic>) {
-        rawUrl = img[0] as String;
-      } else if (img is Map<String, dynamic>) {
-        rawUrl = img['url'] as String? ?? img['src'] as String? ?? '';
-      } else {
-        rawUrl = img as String? ?? '';
-      }
-      if (rawUrl.startsWith('http')) return rawUrl;
-      if (rawUrl.startsWith('//')) return 'https:$rawUrl';
-      if (rawUrl.startsWith('/')) return '$baseUrl$rawUrl';
-      return rawUrl;
-    }).where((url) => url.isNotEmpty).toList();
-  }
+      {bool dataSaver = false}) async => const [];
 }

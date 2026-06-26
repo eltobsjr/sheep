@@ -111,6 +111,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final nextChapterId = ref.watch(
       nextChapterIdProvider((widget.mangaId, widget.chapterId)),
     );
+    final needsJsAsync =
+        ref.watch(readerSourceNeedsJsProvider(widget.chapterId));
 
     return PopScope(
       child: Scaffold(
@@ -123,6 +125,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           isScroll: isScroll,
           isRtl: isRtl,
           nextChapterId: nextChapterId,
+          needsJs: needsJsAsync.valueOrNull ?? false,
         ),
       ),
     );
@@ -136,6 +139,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     required bool isScroll,
     required bool isRtl,
     String? nextChapterId,
+    bool needsJs = false,
   }) {
     if (pagesAsync.isLoading || initialPageAsync.isLoading) {
       final loadingLabel =
@@ -192,12 +196,79 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
-    final pages = pagesAsync.requireValue;
+    final pages = pagesAsync.valueOrNull ?? const [];
     final rawInitial = initialPageAsync.valueOrNull ?? 0;
     final initialPage =
         rawInitial.clamp(0, pages.isEmpty ? 0 : pages.length - 1);
     final chapter = chapterAsync.valueOrNull;
     final chapterLabel = _chapterLabel(mangaTitle, chapter);
+
+    // Sources that require JavaScript to render pages cannot be scraped
+    // directly. Show a prompt to open the chapter in the in-app browser.
+    if (needsJs && pages.isEmpty && chapter != null) {
+      final sourceName = mangaTitle ?? 'esta fonte';
+      final chapterUrl = chapter.url.startsWith('http')
+          ? chapter.url
+          : 'https://mangafire.to/${chapter.url}';
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Esta fonte requer JavaScript',
+                style: TextStyle(
+                  color: paper,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'As páginas de $sourceName só podem ser carregadas pelo browser integrado.',
+                style: const TextStyle(color: slate, fontSize: 13, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: () => context.push(
+                  '/source-browser',
+                  extra: {'url': chapterUrl, 'name': 'MangaFire'},
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: paper,
+                    borderRadius: BorderRadius.circular(radiusPill),
+                  ),
+                  child: const Text(
+                    'Abrir no browser integrado',
+                    style: TextStyle(
+                      color: ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => context.pop(),
+                child: const Text(
+                  '← Voltar',
+                  style: TextStyle(color: slate, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Stack(
       fit: StackFit.expand,

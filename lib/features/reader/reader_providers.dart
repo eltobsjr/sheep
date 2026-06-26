@@ -13,6 +13,18 @@ final readerChapterProvider =
     StreamProvider.autoDispose.family<Chapter?, String>((ref, chapterId) =>
         ref.watch(databaseProvider).watchChapterById(chapterId));
 
+// True when the source for this chapter requires JavaScript to render pages.
+// Used by the reader to show the in-app browser fallback instead of 0 pages.
+final readerSourceNeedsJsProvider =
+    FutureProvider.autoDispose.family<bool, String>((ref, chapterId) async {
+  final db = ref.read(databaseProvider);
+  final chapter = await db.watchChapterById(chapterId).first;
+  if (chapter == null) return false;
+  final manga = await db.watchManga(chapter.mangaId).first;
+  if (manga == null) return false;
+  return sourceById(manga.sourceId)?.requiresJavaScript ?? false;
+});
+
 final readerPagesProvider =
     FutureProvider.autoDispose.family<List<PageImage>, String>(
         (ref, chapterId) async {

@@ -8,6 +8,7 @@ import '../features/library/library_screen.dart';
 import '../features/manga_detail/manga_detail_screen.dart';
 import '../features/reader/reader_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/source_browser/source_browser_screen.dart';
 import '../features/source_credentials/source_credentials_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 
@@ -72,6 +73,16 @@ final router = GoRouter(
       builder: (context, state) => SourceCredentialsScreen(
         sourceId: state.pathParameters['sourceId']!,
       ),
+    ),
+    GoRoute(
+      path: '/source-browser',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, String>;
+        return SourceBrowserScreen(
+          url: extra['url']!,
+          sourceName: extra['name']!,
+        );
+      },
     ),
   ],
 );

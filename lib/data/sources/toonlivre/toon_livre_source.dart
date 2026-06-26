@@ -148,7 +148,8 @@ class ToonLivreSource extends HttpMangaSource {
   @override
   Future<List<ChapterSummary>> getChapters(String mangaId) async {
     final response = await client.get<dynamic>(
-      '/api/mangas/$mangaId/chapters',
+      '/api/mangas/$mangaId/chapters-paginated',
+      queryParameters: {'page': 1, 'limit': 200, 'sort': 'asc'},
       options: _jsonOptions,
     );
 

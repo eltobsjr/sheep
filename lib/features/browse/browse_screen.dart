@@ -148,9 +148,11 @@ class BrowseScreen extends ConsumerWidget {
                           .read(selectedSourceIdProvider.notifier)
                           .state = sourceId,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
+                        padding: EdgeInsets.only(
+                          left: 14,
+                          right: active ? 6 : 14,
+                          top: 7,
+                          bottom: 7,
                         ),
                         decoration: BoxDecoration(
                           color: active ? c.ink : c.wool,
@@ -181,6 +183,32 @@ class BrowseScreen extends ConsumerWidget {
                                 color: active ? c.paper : c.slate,
                               ),
                             ),
+                            if (active) ...[
+                              const SizedBox(width: 6),
+                              GestureDetector(
+                                onTap: () => context.push(
+                                  '/source-browser',
+                                  extra: {
+                                    'url': source.baseUrl,
+                                    'name': source.name,
+                                  },
+                                ),
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: c.paper.withOpacity(0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    Icons.open_in_browser_rounded,
+                                    size: 11,
+                                    color: c.paper,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -259,18 +287,42 @@ class BrowseScreen extends ConsumerWidget {
                         _sourceError(e),
                         style: TextStyle(fontSize: 13, color: c.slate),
                       ),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () => ref.invalidate(popularProvider),
-                        child: Text(
-                          'Tentar novamente',
-                          style: TextStyle(
-                            color: c.ink,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => ref.invalidate(popularProvider),
+                            child: Text(
+                              'Tentar novamente',
+                              style: TextStyle(
+                                color: c.ink,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: () {
+                              final source = sourceById(selectedId);
+                              if (source == null) return;
+                              context.push('/source-browser', extra: {
+                                'url': source.baseUrl,
+                                'name': source.name,
+                              });
+                            },
+                            child: Text(
+                              'Abrir site da fonte',
+                              style: TextStyle(
+                                color: c.slate,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
