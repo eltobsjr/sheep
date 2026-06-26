@@ -36,6 +36,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   int _currentPage = 0;
   bool _overlayVisible = true;
   Timer? _overlayTimer;
+  Timer? _saveDebounce;
   final _pageViewerKey = GlobalKey<_PageViewerState>();
 
   @override
@@ -50,6 +51,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   void dispose() {
     _overlayTimer?.cancel();
+    _saveDebounce?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
     super.dispose();
@@ -69,13 +71,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _onPageChanged(int page, int total) {
     setState(() => _currentPage = page);
-    unawaited(
-      ref.read(databaseProvider).saveReadingProgress(
-            chapterId: widget.chapterId,
-            lastPage: page + 1,
-            pageCount: total,
-          ),
-    );
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 500), () {
+      unawaited(
+        ref.read(databaseProvider).saveReadingProgress(
+              chapterId: widget.chapterId,
+              lastPage: page + 1,
+              pageCount: total,
+            ),
+      );
+    });
   }
 
   void _showPagePicker(BuildContext context, int totalPages) {
@@ -99,9 +104,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider);
-    final isScroll = settings.readingMode == 'scroll';
-    final isRtl = settings.direction == 'rtl';
+    final isScroll = ref.watch(
+        settingsProvider.select((s) => s.readingMode == 'scroll'));
+    final isRtl = ref.watch(
+        settingsProvider.select((s) => s.direction == 'rtl'));
 
     final chapterAsync = ref.watch(readerChapterProvider(widget.chapterId));
     final pagesAsync = ref.watch(readerPagesProvider(widget.chapterId));
@@ -354,6 +360,7 @@ class _PageViewerState extends State<_PageViewer> {
   late final ExtendedPageController _pageController;
   int _currentPage = 0;
   bool _scrollRestored = false;
+  int _screenWidth = 0;
 
   // Per-page GlobalKeys for controlling gesture state (zoom).
   final Map<int, GlobalKey<ExtendedImageGestureState>> _gestureKeys = {};
@@ -388,12 +395,36 @@ class _PageViewerState extends State<_PageViewer> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _screenWidth = MediaQuery.of(context).size.width.round();
+  }
+
+  @override
   void dispose() {
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.removeListener(_restoreScrollOnce);
     _scrollCtrl.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _prefetchPages(int current) {
+    for (final offset in [1, 2]) {
+      final idx = current + offset;
+      if (idx < widget.pages.length) {
+        final page = widget.pages[idx];
+        if (page is NetworkPageImage) {
+          ExtendedNetworkImageProvider(page.url)
+              .resolve(const ImageConfiguration());
+        }
+      }
+    }
+  }
+
+  void _pruneGestureKeys() {
+    _gestureKeys.removeWhere(
+        (k, _) => k < _currentPage - 3 || k > _currentPage + 3);
   }
 
   void _onScroll() {
@@ -406,6 +437,8 @@ class _PageViewerState extends State<_PageViewer> {
     if (page != _currentPage) {
       setState(() => _currentPage = page);
       widget.onPageChanged(page);
+      _prefetchPages(page);
+      _pruneGestureKeys();
     }
   }
 
@@ -464,6 +497,7 @@ class _PageViewerState extends State<_PageViewer> {
         mode: widget.isScroll
             ? ExtendedImageMode.none
             : ExtendedImageMode.gesture,
+        cacheWidth: _screenWidth > 0 ? _screenWidth : null,
         initGestureConfigHandler: widget.isScroll
             ? null
             : (_) => GestureConfig(
@@ -509,6 +543,8 @@ class _PageViewerState extends State<_PageViewer> {
       onPageChanged: (i) {
         setState(() => _currentPage = i);
         widget.onPageChanged(i);
+        _prefetchPages(i);
+        _pruneGestureKeys();
       },
       itemBuilder: (context, index) => _buildImage(widget.pages[index], index),
     );

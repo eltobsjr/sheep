@@ -1,9 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/sources/cloudflare_bypass.dart';
 import '../../data/sources/manga_source.dart';
 import '../../data/sources/source_registry.dart';
 import '../../domain/models/manga.dart';
+
+enum BrowseViewMode { list, grid, compact }
+
+final browseViewModeProvider = StateProvider<BrowseViewMode>((ref) => BrowseViewMode.list);
 
 // Currently selected language filter in Browse: 'all', 'pt-br', 'en'
 final selectedLanguageProvider =
@@ -64,18 +69,22 @@ class SourceSearchResult {
 }
 
 // All-sources search — runs each source in parallel, returns grouped results.
-// Successful sources come first (sorted by order), then failed ones at the end.
+// JS sources are silenced before the search so the CF drawer never opens.
 final allSourcesResultsProvider =
     FutureProvider.autoDispose<List<SourceSearchResult>>((ref) async {
   final query = ref.watch(searchQueryProvider);
   if (query.trim().isEmpty) return const [];
+
+  // Prevent CF bypass sheet from opening during parallel search.
+  for (final s in allSources.where((s) => s.requiresJavaScript)) {
+    CloudflareBypassService.instance.silenceSource(s.id);
+  }
 
   final futures = allSources.map((s) async {
     try {
       final items = await s.search(query, 1);
       return SourceSearchResult(source: s, items: items);
     } catch (e) {
-      // Web sources failing (e.g. CF not yet solved) show no error — just 0 results.
       if (s.requiresJavaScript) return SourceSearchResult(source: s, items: const []);
       return SourceSearchResult(source: s, items: const [], error: e);
     }
@@ -87,9 +96,6 @@ final allSourcesResultsProvider =
   final failed = results.where((r) => r.hasError).toList();
   return [...ok, ...empty, ...failed];
 });
-
-// All sources for display in chips.
-List<MangaSource> get browseSources => allSources;
 
 // Persistent ordered list of source IDs — reorderable via drag-and-drop.
 class SourceOrderNotifier extends StateNotifier<List<String>> {

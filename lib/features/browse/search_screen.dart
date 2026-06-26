@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -492,18 +493,7 @@ class _ResultRow extends StatelessWidget {
   final MangaSummary manga;
   final VoidCallback onTap;
 
-  static const _colors = [
-    Color(0xFF1A1A2E),
-    Color(0xFF5C3B1E),
-    Color(0xFFCC2B2B),
-    Color(0xFF1B2A4A),
-    Color(0xFF8B1A1A),
-    Color(0xFF2D6A4F),
-    Color(0xFF6B3FA0),
-    Color(0xFF2A3F5A),
-  ];
-
-  Color get _color => _colors[manga.id.hashCode.abs() % _colors.length];
+  Color get _color => mangaPlaceholderColors[manga.id.hashCode.abs() % mangaPlaceholderColors.length];
 
   @override
   Widget build(BuildContext context) {
@@ -522,13 +512,30 @@ class _ResultRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 52,
-              height: 70,
-              decoration: BoxDecoration(
-                color: _color,
-                borderRadius: BorderRadius.circular(8),
-              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: manga.coverUrl.isNotEmpty
+                  ? ExtendedImage.network(
+                      manga.coverUrl,
+                      width: 52,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      loadStateChanged: (state) {
+                        if (state.extendedImageLoadState != LoadState.completed) {
+                          return SizedBox(
+                            width: 52,
+                            height: 70,
+                            child: ColoredBox(color: _color),
+                          );
+                        }
+                        return null;
+                      },
+                    )
+                  : SizedBox(
+                      width: 52,
+                      height: 70,
+                      child: ColoredBox(color: _color),
+                    ),
             ),
             const SizedBox(width: 14),
             Expanded(

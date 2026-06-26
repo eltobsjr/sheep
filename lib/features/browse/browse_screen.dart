@@ -27,6 +27,7 @@ class BrowseScreen extends ConsumerWidget {
     final selectedLang = ref.watch(selectedLanguageProvider);
     final popularAsync = ref.watch(popularProvider);
     final latestAsync = ref.watch(latestProvider);
+    final viewMode = ref.watch(browseViewModeProvider);
 
     // Split sources by language filter
     final filteredIds = selectedLang == 'web'
@@ -65,33 +66,62 @@ class BrowseScreen extends ConsumerWidget {
                         color: c.ink,
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => context.push('/browse/search'),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: c.wool,
-                          shape: BoxShape.circle,
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            final next = switch (ref.read(browseViewModeProvider)) {
+                              BrowseViewMode.list => BrowseViewMode.grid,
+                              BrowseViewMode.grid => BrowseViewMode.compact,
+                              BrowseViewMode.compact => BrowseViewMode.list,
+                            };
+                            ref.read(browseViewModeProvider.notifier).state = next;
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: c.wool,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              switch (viewMode) {
+                                BrowseViewMode.list => Icons.view_list_rounded,
+                                BrowseViewMode.grid => Icons.grid_view_rounded,
+                                BrowseViewMode.compact => Icons.apps_rounded,
+                              },
+                              size: 16,
+                              color: c.ink,
+                            ),
+                          ),
                         ),
-                        alignment: Alignment.center,
-                        child: SvgPicture.string(
-                          '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"'
-                          ' stroke="#0A0A0A" stroke-width="1.5" stroke-linecap="round">'
-                          '<circle cx="7" cy="7" r="5"/>'
-                          '<path d="M11 11l3 3"/>'
-                          '</svg>',
-                          width: 16,
-                          height: 16,
-                          colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => context.push('/browse/search'),
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: c.wool,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: SvgPicture.string(
+                              '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"'
+                              ' stroke="#0A0A0A" stroke-width="1.5" stroke-linecap="round">'
+                              '<circle cx="7" cy="7" r="5"/>'
+                              '<path d="M11 11l3 3"/>'
+                              '</svg>',
+                              width: 16,
+                              height: 16,
+                              colorFilter: ColorFilter.mode(c.ink, BlendMode.srcIn),
+                            ),
+                          ),
                         ),
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -253,7 +283,7 @@ class BrowseScreen extends ConsumerWidget {
                   height: 158,
                   child: Center(child: WoolLoading(size: 60)),
                 ),
-                error: (_, _) => const SizedBox(height: 8),
+                error: (_, __) => const SizedBox(height: 8),
                 data: (items) {
                   if (items.isEmpty) return const SizedBox(height: 8);
                   return Padding(
@@ -344,18 +374,13 @@ class BrowseScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              data: (items) => SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => _MangaListItem(
-                    manga: items[i],
-                    sourceName: sourceById(items[i].sourceId)?.name ??
-                        items[i].sourceId,
-                    showChip: true,
-                    onTap: () => unawaited(_onMangaTap(context, ref, items[i])),
-                    c: c,
-                  ),
-                  childCount: items.length,
-                ),
+              data: (items) => _buildMangaSliver(
+                items: items,
+                viewMode: viewMode,
+                showChip: true,
+                context: context,
+                ref: ref,
+                c: c,
               ),
             ),
 
@@ -379,20 +404,14 @@ class BrowseScreen extends ConsumerWidget {
               loading: () => const SliverToBoxAdapter(
                 child: SizedBox(height: 8),
               ),
-              error: (_, _) => const SliverToBoxAdapter(child: SizedBox()),
-              data: (items) => SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => _MangaListItem(
-                    manga: items[i],
-                    sourceName: sourceById(items[i].sourceId)?.name ??
-                        items[i].sourceId,
-                    showChip: false,
-                    onTap: () =>
-                        unawaited(_onMangaTap(context, ref, items[i])),
-                    c: c,
-                  ),
-                  childCount: items.length,
-                ),
+              error: (_, __) => const SliverToBoxAdapter(child: SizedBox()),
+              data: (items) => _buildMangaSliver(
+                items: items,
+                viewMode: viewMode,
+                showChip: false,
+                context: context,
+                ref: ref,
+                c: c,
               ),
             ),
 
@@ -432,6 +451,70 @@ Future<void> _onMangaTap(
   if (context.mounted) unawaited(context.push('/manga/${manga.id}'));
 }
 
+Widget _buildMangaSliver({
+  required List<MangaSummary> items,
+  required BrowseViewMode viewMode,
+  required bool showChip,
+  required BuildContext context,
+  required WidgetRef ref,
+  required SheepColors c,
+}) {
+  switch (viewMode) {
+    case BrowseViewMode.list:
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (ctx, i) => _MangaListItem(
+            manga: items[i],
+            sourceName: sourceById(items[i].sourceId)?.name ?? items[i].sourceId,
+            showChip: showChip,
+            onTap: () => unawaited(_onMangaTap(context, ref, items[i])),
+            c: c,
+          ),
+          childCount: items.length,
+        ),
+      );
+    case BrowseViewMode.grid:
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 0.62,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (ctx, i) => _MangaGridItem(
+              manga: items[i],
+              onTap: () => unawaited(_onMangaTap(context, ref, items[i])),
+              c: c,
+            ),
+            childCount: items.length,
+          ),
+        ),
+      );
+    case BrowseViewMode.compact:
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+            childAspectRatio: 0.68,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (ctx, i) => _MangaCompactItem(
+              manga: items[i],
+              onTap: () => unawaited(_onMangaTap(context, ref, items[i])),
+            ),
+            childCount: items.length,
+          ),
+        ),
+      );
+  }
+}
+
 // ── Featured card ─────────────────────────────────────────────────────────────
 
 class _FeaturedCard extends StatelessWidget {
@@ -445,12 +528,7 @@ class _FeaturedCard extends StatelessWidget {
   final String sourceName;
   final VoidCallback onTap;
 
-  static const _colors = [
-    Color(0xFF1A1A2E), Color(0xFF5C3B1E), Color(0xFFCC2B2B), Color(0xFF1B2A4A),
-    Color(0xFF8B1A1A), Color(0xFF2D6A4F), Color(0xFF6B3FA0), Color(0xFF2A3F5A),
-  ];
-
-  Color get _bg => _colors[manga.id.hashCode.abs() % _colors.length];
+  Color get _bg => mangaPlaceholderColors[manga.id.hashCode.abs() % mangaPlaceholderColors.length];
 
   @override
   Widget build(BuildContext context) {
@@ -602,18 +680,7 @@ class _MangaListItem extends StatelessWidget {
   final VoidCallback onTap;
   final SheepColors c;
 
-  static const _colors = [
-    Color(0xFF1A1A2E),
-    Color(0xFF5C3B1E),
-    Color(0xFFCC2B2B),
-    Color(0xFF1B2A4A),
-    Color(0xFF8B1A1A),
-    Color(0xFF2D6A4F),
-    Color(0xFF6B3FA0),
-    Color(0xFF2A3F5A),
-  ];
-
-  Color get _color => _colors[manga.id.hashCode.abs() % _colors.length];
+  Color get _color => mangaPlaceholderColors[manga.id.hashCode.abs() % mangaPlaceholderColors.length];
 
   @override
   Widget build(BuildContext context) {
@@ -688,6 +755,128 @@ class _MangaListItem extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Grid item (2-column) ──────────────────────────────────────────────────────
+
+class _MangaGridItem extends StatelessWidget {
+  const _MangaGridItem({
+    required this.manga,
+    required this.onTap,
+    required this.c,
+  });
+
+  final MangaSummary manga;
+  final VoidCallback onTap;
+  final SheepColors c;
+
+  Color get _color => mangaPlaceholderColors[manga.id.hashCode.abs() % mangaPlaceholderColors.length];
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radiusCard),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.wool,
+            border: Border.all(color: c.border),
+            borderRadius: BorderRadius.circular(radiusCard),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 3,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(radiusCard)),
+                  child: _RemoteCover(
+                    url: manga.coverUrl,
+                    fallbackColor: _color,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                child: Text(
+                  manga.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1.3,
+                    color: c.ink,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Compact item (3-column) ───────────────────────────────────────────────────
+
+class _MangaCompactItem extends StatelessWidget {
+  const _MangaCompactItem({required this.manga, required this.onTap});
+
+  final MangaSummary manga;
+  final VoidCallback onTap;
+
+  Color get _color => mangaPlaceholderColors[manga.id.hashCode.abs() % mangaPlaceholderColors.length];
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radiusCard),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _RemoteCover(
+              url: manga.coverUrl,
+              fallbackColor: _color,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(6, 20, 6, 6),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xCC000000)],
+                  ),
+                ),
+                child: Text(
+                  manga.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    height: 1.2,
+                    color: Color(0xFFFAFAFA),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           ],
         ),
       ),

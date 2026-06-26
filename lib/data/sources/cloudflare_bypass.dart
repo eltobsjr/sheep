@@ -35,6 +35,16 @@ class CloudflareBypassService {
 
   final _completers = <String, Completer<void>>{};
 
+  // Sources silenced temporarily (e.g. during global search) won't open the bypass sheet.
+  final _silenced = <String>{};
+
+  void silenceSource(String sourceId, {Duration duration = const Duration(seconds: 15)}) {
+    _silenced.add(sourceId);
+    Future<void>.delayed(duration, () => _silenced.remove(sourceId));
+  }
+
+  bool isSourceSilenced(String sourceId) => _silenced.contains(sourceId);
+
   void _emit(CloudflareException ex) => _controller.add(ex);
 
   // Returns a Future that completes when the UI resolves the bypass for [url].
@@ -79,6 +89,9 @@ class CloudflareInterceptor extends Interceptor {
     if (status == 403 || status == 503) {
       final body = err.response?.data?.toString() ?? '';
       if (_isCloudflarePage(body, err)) {
+        if (CloudflareBypassService.instance.isSourceSilenced(sourceId)) {
+          handler.next(err); return;
+        }
         CloudflareBypassService.instance._emit(
           CloudflareException(url: baseUrl, sourceId: sourceId),
         );
