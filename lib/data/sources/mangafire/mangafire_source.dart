@@ -192,12 +192,14 @@ class MangaFireSource extends HttpMangaSource {
       final href = a?.attributes['href'] ?? '';
 
       final dataNumber = li.attributes['data-number'] ?? '';
-      final numMatch = dataNumber.isNotEmpty
-          ? RegExp(r'\d+\.?\d*').firstMatch(dataNumber)
-          : RegExp(r'chapter-(\d+\.?\d*)').firstMatch(href);
-      final number = double.tryParse(
-              numMatch?.group(1) ?? numMatch?.group(0) ?? '') ??
-          0.0;
+      final double number;
+      if (dataNumber.isNotEmpty) {
+        final m = RegExp(r'\d+\.?\d*').firstMatch(dataNumber);
+        number = double.tryParse(m?.group(0) ?? '') ?? 0.0;
+      } else {
+        final m = RegExp(r'chapter-(\d+\.?\d*)').firstMatch(href);
+        number = double.tryParse(m?.group(1) ?? '') ?? 0.0;
+      }
       if (number == 0.0 && dataNumber.isEmpty) continue;
 
       final numForUrl = number == number.truncateToDouble()

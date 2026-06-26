@@ -175,7 +175,7 @@ class ToonLivreSource extends HttpMangaSource {
     final (numericId, slug) = _splitUrl(mangaUrl);
     final response = await client.get<dynamic>(
       '/api/mangas/$numericId/chapters-paginated',
-      queryParameters: {'page': 1, 'limit': 200, 'sort': 'asc'},
+      queryParameters: {'page': 1, 'limit': 500, 'sort': 'asc'},
       options: _jsonOptions,
     );
 
@@ -191,11 +191,14 @@ class ToonLivreSource extends HttpMangaSource {
 
     final chapters = <ChapterSummary>[];
     for (final ch in list) {
+      if (ch is! Map) continue;
       final chId = ch['id']?.toString() ?? '';
       if (chId.isEmpty) continue;
-      final numStr = ch['number']?.toString() ?? '';
-      final number = double.tryParse(numStr) ?? 0.0;
+      final number = double.tryParse(ch['number']?.toString() ?? '') ?? 0.0;
       final title = ch['title'] as String? ?? '';
+      final numForUrl = number == number.truncateToDouble()
+          ? number.toInt().toString()
+          : number.toString();
 
       DateTime? uploadedAt;
       final ts = ch['timestamp'] ?? ch['releaseDate'];
@@ -203,13 +206,9 @@ class ToonLivreSource extends HttpMangaSource {
         uploadedAt = DateTime.fromMillisecondsSinceEpoch(ts);
       }
 
-      final numForUrl = number == number.truncateToDouble()
-          ? number.toInt().toString()
-          : number.toString();
-
       chapters.add(ChapterSummary(
         id: chId,
-        title: title.isNotEmpty ? title : 'Capítulo $numStr',
+        title: title.isNotEmpty ? title : 'Capítulo $numForUrl',
         number: number,
         url: '$slug/$numForUrl',
         uploadedAt: uploadedAt,
