@@ -34,10 +34,11 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   int _currentPage = 0;
+  bool _initialPageSynced = false;
   bool _overlayVisible = true;
   Timer? _overlayTimer;
   Timer? _saveDebounce;
-  final _pageViewerKey = GlobalKey<_PageViewerState>();
+  var _pageViewerKey = GlobalKey<_PageViewerState>();
 
   @override
   void initState() {
@@ -55,6 +56,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  void _toggleMode(bool currentIsScroll) {
+    // New GlobalKey forces _PageViewer to recreate with fresh state at _currentPage.
+    _pageViewerKey = GlobalKey<_PageViewerState>();
+    ref.read(settingsProvider.notifier).setReadingMode(
+      currentIsScroll ? 'paginated' : 'scroll',
+    );
   }
 
   void _toggleOverlay() {
@@ -214,6 +223,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final rawInitial = initialPageAsync.valueOrNull ?? 0;
     final initialPage =
         rawInitial.clamp(0, pages.isEmpty ? 0 : pages.length - 1);
+    // effectivePage: after mode toggle, use _currentPage (set by _onPageChanged);
+    // on first open, _currentPage=0 so fall back to saved initialPage.
+    final effectivePage = _currentPage > 0 ? _currentPage : initialPage;
+    // Sync _currentPage to initialPage once so mode toggle uses the right position
+    // even before the user has scrolled/swiped.
+    if (!_initialPageSynced && initialPage > 0) {
+      _initialPageSynced = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _currentPage == 0) setState(() => _currentPage = initialPage);
+      });
+    }
     final chapter = chapterAsync.valueOrNull;
     final chapterLabel = _chapterLabel(mangaTitle, chapter);
 
@@ -299,7 +319,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             pages: pages,
             isScroll: isScroll,
             isRtl: isRtl,
-            initialPage: initialPage,
+            initialPage: effectivePage,
             onPageChanged: (i) => _onPageChanged(i, pages.length),
           ),
         ),
@@ -319,6 +339,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onZoomIn: () => _pageViewerKey.currentState?.zoomIn(),
               onZoomOut: () => _pageViewerKey.currentState?.zoomOut(),
               onPageTap: () => _showPagePicker(context, pages.length),
+              onToggleMode: () => _toggleMode(isScroll),
               onNextChapter: nextChapterId == null
                   ? null
                   : () => context.pushReplacement(
@@ -370,7 +391,6 @@ class _PageViewerState extends State<_PageViewer> {
   late final ScrollController _scrollCtrl;
   late final ExtendedPageController _pageController;
   int _currentPage = 0;
-  bool _scrollRestored = false;
   int _screenWidth = 0;
 
   // Per-page GlobalKeys for controlling gesture state (zoom).
@@ -382,27 +402,19 @@ class _PageViewerState extends State<_PageViewer> {
     _currentPage = widget.initialPage;
     _pageController =
         ExtendedPageController(initialPage: widget.initialPage);
-    _scrollCtrl = ScrollController();
-    _scrollCtrl.addListener(_onScroll);
-    // Scroll mode: restore saved position once content has loaded
-    // (maxScrollExtent is 0 on the first frame while images are loading).
+    // Scroll mode: initialScrollOffset estimates the position of initialPage
+    // using portrait-manga aspect ratio (width × 1.45 per page). This lets
+    // Flutter render the correct viewport immediately without waiting for images.
+    double initialOffset = 0.0;
     if (widget.isScroll && widget.initialPage > 0) {
-      _scrollCtrl.addListener(_restoreScrollOnce);
+      final view =
+          WidgetsBinding.instance.platformDispatcher.views.first;
+      final logicalWidth =
+          view.physicalSize.width / view.devicePixelRatio;
+      initialOffset = logicalWidth * 1.45 * widget.initialPage;
     }
-  }
-
-  void _restoreScrollOnce() {
-    if (_scrollRestored || !_scrollCtrl.hasClients) return;
-    final max = _scrollCtrl.position.maxScrollExtent;
-    if (max <= 0) return;
-    _scrollRestored = true;
-    _scrollCtrl.removeListener(_restoreScrollOnce);
-    if (widget.pages.length > 1) {
-      _scrollCtrl.jumpTo(
-        (max * widget.initialPage / (widget.pages.length - 1))
-            .clamp(0.0, max),
-      );
-    }
+    _scrollCtrl = ScrollController(initialScrollOffset: initialOffset);
+    _scrollCtrl.addListener(_onScroll);
   }
 
   @override
@@ -414,7 +426,6 @@ class _PageViewerState extends State<_PageViewer> {
   @override
   void dispose() {
     _scrollCtrl.removeListener(_onScroll);
-    _scrollCtrl.removeListener(_restoreScrollOnce);
     _scrollCtrl.dispose();
     _pageController.dispose();
     super.dispose();
@@ -499,77 +510,65 @@ class _PageViewerState extends State<_PageViewer> {
   }
 
   Widget _buildImage(PageImage page, int index) {
+    // Scroll mode: no gesture key needed (zoom is per-image, no overlay buttons).
+    // Paged mode: gesture key allows overlay zoom buttons to control current page.
     final key = widget.isScroll ? null : _gestureKeyFor(index);
+    final gestureConfig = GestureConfig(
+      minScale: 0.9,
+      maxScale: 4.0,
+      inPageView: !widget.isScroll,
+    );
     if (page is NetworkPageImage) {
       return ExtendedImage.network(
         page.url,
         key: key,
         fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
-        mode: widget.isScroll
-            ? ExtendedImageMode.none
-            : ExtendedImageMode.gesture,
+        mode: ExtendedImageMode.gesture,
         cacheWidth: _screenWidth > 0 ? _screenWidth : null,
-        initGestureConfigHandler: widget.isScroll
-            ? null
-            : (_) => GestureConfig(
-                  minScale: 0.9,
-                  maxScale: 4.0,
-                  inPageView: true,
-                ),
-        loadStateChanged: widget.isScroll
-            ? (state) {
-                if (state.extendedImageLoadState == LoadState.failed) {
-                  return Container(
-                    height: 300,
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.broken_image_outlined,
-                            color: slate, size: 32),
-                        const SizedBox(height: 12),
-                        GestureDetector(
-                          onTap: () => state.reLoadImage(),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0x38FAFAFA),
-                              borderRadius:
-                                  BorderRadius.circular(radiusPill),
-                            ),
-                            child: const Text(
-                              '↻ Tentar novamente',
-                              style: TextStyle(
-                                  color: paper,
-                                  fontSize: 13,
-                                  fontFamily: fontMono),
-                            ),
-                          ),
-                        ),
-                      ],
+        initGestureConfigHandler: (_) => gestureConfig,
+        loadStateChanged: (state) {
+          if (state.extendedImageLoadState == LoadState.failed) {
+            return Container(
+              height: 300,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.broken_image_outlined,
+                      color: slate, size: 32),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => state.reLoadImage(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0x38FAFAFA),
+                        borderRadius: BorderRadius.circular(radiusPill),
+                      ),
+                      child: const Text(
+                        '↻ Tentar novamente',
+                        style: TextStyle(
+                            color: paper,
+                            fontSize: 13,
+                            fontFamily: fontMono),
+                      ),
                     ),
-                  );
-                }
-                return null;
-              }
-            : null,
+                  ),
+                ],
+              ),
+            );
+          }
+          return null;
+        },
       );
     }
     return ExtendedImage.file(
       (page as FilePageImage).file,
       key: key,
       fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
-      mode: widget.isScroll
-          ? ExtendedImageMode.none
-          : ExtendedImageMode.gesture,
-      initGestureConfigHandler: widget.isScroll
-          ? null
-          : (_) => GestureConfig(
-                minScale: 0.9,
-                maxScale: 4.0,
-                inPageView: true,
-              ),
+      mode: ExtendedImageMode.gesture,
+      initGestureConfigHandler: (_) => gestureConfig,
     );
   }
 
@@ -612,6 +611,7 @@ class _Overlay extends StatelessWidget {
     required this.onZoomIn,
     required this.onZoomOut,
     required this.onPageTap,
+    required this.onToggleMode,
     this.onNextChapter,
   });
 
@@ -623,6 +623,7 @@ class _Overlay extends StatelessWidget {
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
   final VoidCallback onPageTap;
+  final VoidCallback onToggleMode;
   final VoidCallback? onNextChapter;
 
   @override
@@ -698,19 +699,27 @@ class _Overlay extends StatelessWidget {
           ),
         ),
 
-        // Zoom buttons (bottom left, paged mode only)
-        if (!isScroll)
-          Positioned(
-            left: 16,
-            bottom: bottomPad + 28,
-            child: Row(
-              children: [
+        // Bottom-left controls: toggle mode + zoom buttons (paged mode only)
+        Positioned(
+          left: 16,
+          bottom: bottomPad + 28,
+          child: Row(
+            children: [
+              _OverlayIconBtn(
+                icon: isScroll
+                    ? Icons.menu_book_outlined   // scroll → switch to paged
+                    : Icons.view_day_outlined,   // paged  → switch to scroll
+                onTap: onToggleMode,
+              ),
+              if (!isScroll) ...[
+                const SizedBox(width: 8),
                 _OverlayRoundBtn(label: '−', onTap: onZoomOut),
                 const SizedBox(width: 8),
                 _OverlayRoundBtn(label: '+', onTap: onZoomIn),
               ],
-            ),
+            ],
           ),
+        ),
 
         // Page counter pill (bottom center, tappable → page picker)
         Positioned(
@@ -865,6 +874,33 @@ class _OverlayRoundBtn extends StatelessWidget {
             fontWeight: FontWeight.w300,
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Icon overlay button ───────────────────────────────────────────────────────
+
+class _OverlayIconBtn extends StatelessWidget {
+  const _OverlayIconBtn({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: const BoxDecoration(
+          color: Color(0xB80A0A0A),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, color: paper, size: 18),
       ),
     );
   }

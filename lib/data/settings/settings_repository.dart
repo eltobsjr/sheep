@@ -7,7 +7,7 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
 
 class Settings {
   const Settings({
-    this.readingMode = 'paginated',
+    this.readingMode = 'scroll',
     this.direction = 'rtl',
     this.keepScreenOn = true,
     this.wifiOnly = true,
@@ -57,7 +57,7 @@ class SettingsNotifier extends Notifier<Settings> {
   Settings build() {
     final p = ref.read(sharedPreferencesProvider);
     return Settings(
-      readingMode: p.getString(_kMode) ?? 'paginated',
+      readingMode: p.getString(_kMode) ?? 'scroll',
       direction: p.getString(_kDir) ?? 'rtl',
       keepScreenOn: p.getBool(_kScreen) ?? true,
       wifiOnly: p.getBool(_kWifi) ?? true,
