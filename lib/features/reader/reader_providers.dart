@@ -13,9 +13,9 @@ final readerChapterProvider =
     StreamProvider.autoDispose.family<Chapter?, String>((ref, chapterId) =>
         ref.watch(databaseProvider).watchChapterById(chapterId));
 
-// Source info for the reader — needsJs, name, and chapterBrowserUrl in one provider.
+// Source info for the reader — needsJs, name, id, and chapterBrowserUrl in one provider.
 final readerSourceInfoProvider = FutureProvider.autoDispose.family<
-    ({bool needsJs, String name, String Function(String) browserUrl})?,
+    ({bool needsJs, String name, String id, String Function(String) browserUrl})?,
     String>((ref, chapterId) async {
   final db = ref.read(databaseProvider);
   final chapter = await db.watchChapterById(chapterId).first;
@@ -27,6 +27,7 @@ final readerSourceInfoProvider = FutureProvider.autoDispose.family<
   return (
     needsJs: source.requiresJavaScript,
     name: source.name,
+    id: source.id,
     browserUrl: source.chapterBrowserUrl,
   );
 });

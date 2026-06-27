@@ -286,19 +286,6 @@ class MangaOnlineSource extends MadaraSource {
   String get searchSelector => '#loop-content .page-listing-item';
 }
 
-class NebulosaScanSource extends MadaraSource {
-  @override
-  String get id => 'nebulosascan';
-  @override
-  String get name => 'Nebulosa Scan';
-  @override
-  String get baseUrl => 'https://nebulosascan.com';
-  @override
-  String get iconAsset => 'assets/svg/sources/nebulosascan.svg';
-  @override
-  String get language => 'pt-br';
-}
-
 class MangaLivreToSource extends MadaraSource {
   @override
   String get id => 'mangalivretto';

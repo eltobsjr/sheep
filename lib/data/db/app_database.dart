@@ -84,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -121,11 +121,32 @@ class AppDatabase extends _$AppDatabase {
           'ALTER TABLE download_queue_new RENAME TO download_queue',
         );
       }
+      if (from < 6) {
+        await m.addColumn(mangas, mangas.sortOrder);
+      }
     },
   );
 
   Stream<List<Manga>> watchLibraryMangas() =>
-      (select(mangas)..where((m) => m.inLibrary.equals(true))).watch();
+      (select(mangas)
+            ..where((m) => m.inLibrary.equals(true))
+            ..orderBy([
+              (m) => OrderingTerm.asc(m.sortOrder, nulls: NullsOrder.last),
+              (m) => OrderingTerm.asc(m.title),
+            ]))
+          .watch();
+
+  Future<void> updateSortOrders(List<String> orderedIds) async {
+    await batch((b) {
+      for (var i = 0; i < orderedIds.length; i++) {
+        b.update(
+          mangas,
+          MangasCompanion(sortOrder: Value(i)),
+          where: (m) => m.id.equals(orderedIds[i]),
+        );
+      }
+    });
+  }
 
   Stream<Manga?> watchManga(String mangaId) =>
       (select(mangas)..where((m) => m.id.equals(mangaId)))
@@ -380,9 +401,6 @@ class AppDatabase extends _$AppDatabase {
       ));
     }
   }
-
-  Stream<LastReadEntry?> watchLastRead() => watchRecentlyRead(limit: 1)
-      .map((list) => list.isEmpty ? null : list.first);
 
   // Returns the most recently read chapter per manga for the given limit,
   // ordered by last-read time descending. One entry per manga (latest chapter).

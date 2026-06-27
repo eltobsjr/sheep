@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -164,6 +165,7 @@ class _DetailBody extends ConsumerWidget {
         context.push('/source-browser', extra: {
           'url': source.chapterBrowserUrl(ch.url),
           'name': source.name,
+          'sourceId': source.id,
           'mangaId': mangaId,
           'chapterId': ch.id,
         });
@@ -518,6 +520,40 @@ class _DetailBody extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Download All
+                          if (!needsJs)
+                            GestureDetector(
+                              onTap: () {
+                                final ds = ref.read(downloadServiceProvider);
+                                final pending = allChapters
+                                    .where((ch) => !ch.isDownloaded)
+                                    .toList();
+                                for (final ch in pending) {
+                                  ds.queue(ch.id);
+                                }
+                                if (pending.isNotEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${pending.length} capítulo${pending.length == 1 ? '' : 's'} adicionado${pending.length == 1 ? '' : 's'} à fila',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                      duration: const Duration(seconds: 2),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+                                child: Icon(
+                                  Icons.download_for_offline_outlined,
+                                  size: 16,
+                                  color: c.slate,
+                                ),
+                              ),
+                            ),
                           // Offline filter toggle
                           GestureDetector(
                             onTap: onToggleOfflineOnly,
@@ -604,30 +640,115 @@ class _DetailBody extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Erro ao buscar capítulos.\nVerifique sua conexão.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.5,
-                              color: c.slate,
+                      child: _isCfBlocked(fetchAsync.error)
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Acesso bloqueado.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.5,
+                                    color: c.ink,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Abra a fonte no navegador, depois volte e tente novamente.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.5,
+                                    color: c.slate,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (source != null)
+                                      GestureDetector(
+                                        onTap: () => context.push(
+                                          '/source-browser',
+                                          extra: {
+                                            'url': source.baseUrl,
+                                            'name': source.name,
+                                            'sourceId': source.id,
+                                          },
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 9,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: c.wool,
+                                            borderRadius: BorderRadius.circular(radiusPill),
+                                          ),
+                                          child: Text(
+                                            'Abrir navegador',
+                                            style: TextStyle(
+                                              color: c.ink,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: () => ref.invalidate(
+                                        fetchMangaDetailProvider(mangaId),
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 9,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: c.ink,
+                                          borderRadius: BorderRadius.circular(radiusPill),
+                                        ),
+                                        child: Text(
+                                          'Tentar novamente',
+                                          style: TextStyle(
+                                            color: c.paper,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Erro ao buscar capítulos.\nVerifique sua conexão.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.5,
+                                    color: c.slate,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  fetchAsync.error.toString(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    height: 1.4,
+                                    color: c.slate,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            fetchAsync.error.toString(),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              height: 1.4,
-                              color: c.slate,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   )
                 else
@@ -678,6 +799,14 @@ class _DetailBody extends ConsumerWidget {
 
   String _fmtNum(double n) =>
       n == n.truncateToDouble() ? n.toInt().toString() : n.toString();
+}
+
+bool _isCfBlocked(Object? error) {
+  if (error is DioException) {
+    final status = error.response?.statusCode;
+    if (status == 403 || status == 503) return true;
+  }
+  return false;
 }
 
 // ── Hero cover ────────────────────────────────────────────────────────────────

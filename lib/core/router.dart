@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/browse/browse_screen.dart';
 import '../features/browse/search_screen.dart';
 import '../features/downloads/downloads_screen.dart';
+import '../features/library/history_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/manga_detail/manga_detail_screen.dart';
 import '../features/reader/reader_screen.dart';
@@ -75,12 +76,17 @@ final router = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/history',
+      builder: (context, state) => const HistoryScreen(),
+    ),
+    GoRoute(
       path: '/source-browser',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
         return SourceBrowserScreen(
           url: extra['url'] as String,
           sourceName: extra['name'] as String,
+          sourceId: extra['sourceId'] as String? ?? '',
           mangaId: extra['mangaId'] as String?,
           chapterId: extra['chapterId'] as String?,
         );

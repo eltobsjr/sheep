@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 
-// Wool loading animation: sheep grows in → wool puffs shed one by one,
-// each falling with gravity → repeats. Matches the Sheep brand mascot exactly.
+// Wool loading animation — phases:
+//   0.00–0.15  grow in      (elasticOut scale from center)
+//   0.15–0.30  idle breath  (body pulse, tail sways)
+//   0.30–0.82  puff shedding (anticipation up → fall with fade)
+//   0.82–0.90  blink
+//   0.90–1.00  fade out
 class WoolLoading extends StatefulWidget {
   const WoolLoading({super.key, this.size = 120});
 
@@ -19,16 +23,12 @@ class _WoolLoadingState extends State<WoolLoading>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
 
-  // Phase 0.0–0.2  → sheep grows in (scale 0→1)
-  // Phase 0.2–0.8  → puffs shed in sequence (6 puffs fall)
-  // Phase 0.8–1.0  → fade out, restart
-
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: const Duration(milliseconds: 3000),
     )..repeat();
   }
 
@@ -53,10 +53,10 @@ class _WoolLoadingState extends State<WoolLoading>
 class _WoolPainter extends CustomPainter {
   _WoolPainter(this.t);
 
-  final double t; // 0.0 → 1.0 animation progress
+  final double t;
 
-  // 6 puff definitions from the SVG (normalized to 100×112 viewBox)
-  // Ordered bottom-to-top so bottom puffs shed first (like real shearing).
+  // 6 puff definitions (normalized to 100×112 viewBox).
+  // Ordered bottom-to-top so lower puffs shed first (like real shearing).
   static const _puffs = [
     (cx: 50.0, cy: 68.0, r: 20.0), // body center — sheds 1st
     (cx: 33.0, cy: 65.0, r: 15.0), // body left   — sheds 2nd
@@ -71,49 +71,82 @@ class _WoolPainter extends CustomPainter {
     final scale = size.width / 100.0;
     canvas.scale(scale, scale);
 
-    // ── Phase: grow in ────────────────────────────────────────────────────
-    final growT = (t / 0.2).clamp(0.0, 1.0);
-    final globalScale = Curves.elasticOut.transform(growT);
-    const pivot = Offset(50, 56); // center of the sheep body
+    // ── Grow-in (0.00–0.15) ──────────────────────────────────────────────────
+    final growT = (t / 0.15).clamp(0.0, 1.0);
+    var bodyScale = Curves.elasticOut.transform(growT);
+
+    // ── Breathing pulse (0.15–0.30) ──────────────────────────────────────────
+    if (t >= 0.15 && t < 0.30) {
+      final breathT = ((t - 0.15) / 0.15).clamp(0.0, 1.0);
+      bodyScale *= 1.0 + sin(breathT * pi) * 0.035;
+    }
+
+    // ── Global fade-out (0.90–1.00) ──────────────────────────────────────────
+    final fadeT = ((t - 0.90) / 0.10).clamp(0.0, 1.0);
+    final globalOpacity = (1.0 - Curves.easeIn.transform(fadeT)).clamp(0.0, 1.0);
+    final inkA = (globalOpacity * 255).round();
+
+    // Scale the whole mascot from body center
+    const pivot = Offset(50, 62);
     canvas.save();
     canvas.translate(pivot.dx, pivot.dy);
-    canvas.scale(globalScale);
+    canvas.scale(bodyScale);
     canvas.translate(-pivot.dx, -pivot.dy);
 
-    // ── Paint each puff ───────────────────────────────────────────────────
-    // Shearing starts at t=0.2, each puff takes 0.1 of the timeline.
-    final shearedFraction = ((t - 0.2) / 0.6).clamp(0.0, 1.0);
+    // ── Tail (drawn before puffs so puffs initially cover it) ────────────────
+    // Peeks out from behind the right body puff; revealed as puffs fall.
+    final tailAngle = sin(t * 2 * pi * 3) * 0.22;
+    canvas.save();
+    canvas.translate(76, 67);
+    canvas.rotate(tailAngle);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: 10, height: 7),
+      Paint()..color = ink.withAlpha(inkA),
+    );
+    canvas.restore();
+
+    // ── Puff shedding (0.30–0.82) ────────────────────────────────────────────
+    final shearedFraction = ((t - 0.30) / 0.52).clamp(0.0, 1.0);
 
     for (var i = 0; i < _puffs.length; i++) {
       final p = _puffs[i];
-      final puffShedAt = i / _puffs.length; // 0, 0.167, 0.333 …
-      final puffT = ((shearedFraction - puffShedAt) / (1 / _puffs.length))
-          .clamp(0.0, 1.0);
+      final puffShedAt = i / _puffs.length;
+      final puffT =
+          ((shearedFraction - puffShedAt) / (1.0 / _puffs.length))
+              .clamp(0.0, 1.0);
 
-      // Before shedding: solid ink puff
-      // While shedding: opacity drops, puff falls downward
-      final opacity = (1.0 - puffT).clamp(0.0, 1.0);
-      final fallY = puffT * puffT * 40.0; // gravity-like fall
+      // Anticipation: puff jiggles up before falling
+      final anticipateT = (puffT / 0.25).clamp(0.0, 1.0);
+      final fallT = ((puffT - 0.25) / 0.75).clamp(0.0, 1.0);
+      final upY = -sin(anticipateT * pi) * 5.0;
+      final downY = Curves.easeIn.transform(fallT) * 44.0;
 
-      final paint = Paint()..color = ink.withAlpha((opacity * 255).round());
-      canvas.drawCircle(Offset(p.cx, p.cy + fallY), p.r, paint);
+      final puffOpacity =
+          (1.0 - Curves.easeIn.transform(fallT)) * globalOpacity;
+      final puffScale = 1.0 - fallT * 0.3;
+
+      canvas.save();
+      canvas.translate(p.cx, p.cy + upY + downY);
+      canvas.scale(puffScale);
+      canvas.drawCircle(
+        Offset.zero,
+        p.r,
+        Paint()..color = ink.withAlpha((puffOpacity * 255).round()),
+      );
+      canvas.restore();
     }
 
-    // ── Fixed elements (always visible) ───────────────────────────────────
-    final bodyPaint = Paint()..color = ink;
-    final eyePaint = Paint()..color = paper;
-    final mouthPaint = Paint()
-      ..color = paper.withAlpha((0.55 * 255).round());
+    // ── Head (bigger: 28×30) ──────────────────────────────────────────────────
+    final bodyPaint = Paint()..color = ink.withAlpha(inkA);
 
-    // Head
     canvas.drawOval(
-      Rect.fromCenter(center: const Offset(50, 29), width: 24, height: 26),
+      Rect.fromCenter(center: const Offset(50, 27), width: 28, height: 30),
       bodyPaint,
     );
 
-    // Ears
+    // ── Ears ──────────────────────────────────────────────────────────────────
     canvas.save();
-    canvas.translate(38, 19);
+    canvas.translate(36, 15);
     canvas.rotate(-22 * pi / 180);
     canvas.drawOval(
       Rect.fromCenter(center: Offset.zero, width: 12, height: 16),
@@ -122,7 +155,7 @@ class _WoolPainter extends CustomPainter {
     canvas.restore();
 
     canvas.save();
-    canvas.translate(62, 19);
+    canvas.translate(64, 15);
     canvas.rotate(22 * pi / 180);
     canvas.drawOval(
       Rect.fromCenter(center: Offset.zero, width: 12, height: 16),
@@ -130,59 +163,72 @@ class _WoolPainter extends CustomPainter {
     );
     canvas.restore();
 
-    // Legs
-    final legPaint = Paint()..color = ink;
-    final legRRect = RRect.fromRectAndRadius(
-      Rect.zero,
-      const Radius.circular(4.5),
-    );
+    // ── Legs + paws ───────────────────────────────────────────────────────────
     for (final (x, y) in const [
-      (28.0, 85.0),
-      (40.0, 86.0),
-      (51.0, 86.0),
-      (63.0, 85.0),
+      (28.0, 83.0),
+      (40.0, 84.0),
+      (51.0, 84.0),
+      (63.0, 83.0),
     ]) {
       canvas.drawRRect(
-        legRRect.shift(Offset(x, y)).inflate(0).copyWith(
-          top: y,
-          left: x,
-          right: x + 9,
-          bottom: y + 22,
+        RRect.fromLTRBR(x, y, x + 8, y + 17, const Radius.circular(4)),
+        bodyPaint,
+      );
+      // Wider oval at bottom = hoof/paw shape
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(x + 4, y + 19.5),
+          width: 13,
+          height: 6,
         ),
-        legPaint,
+        bodyPaint,
       );
     }
 
-    // Eyes
-    canvas.drawCircle(const Offset(45, 26), 2.5, eyePaint);
-    canvas.drawCircle(const Offset(55, 26), 2.5, eyePaint);
+    // ── Eyes (blink at 0.82–0.90) ────────────────────────────────────────────
+    final blinkT = ((t - 0.82) / 0.08).clamp(0.0, 1.0);
+    final eyeH = (2.8 * (1.0 - sin(blinkT * pi))).clamp(0.1, 2.8);
+    final eyePaint = Paint()
+      ..color = paper.withAlpha((globalOpacity * 255).round());
 
-    // Mouth
     canvas.drawOval(
-      Rect.fromCenter(center: const Offset(50, 33), width: 7, height: 5),
-      mouthPaint,
+      Rect.fromCenter(center: const Offset(44, 24), width: 5.6, height: eyeH * 2),
+      eyePaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(56, 24), width: 5.6, height: eyeH * 2),
+      eyePaint,
     );
 
-    canvas.restore(); // undo grow transform
+    // ── Eyebrows ──────────────────────────────────────────────────────────────
+    // Relaxed during idle; determined (angled inward) during shedding.
+    final shedding = t > 0.30 && t < 0.82;
+    final browPaint = Paint()
+      ..color = paper.withAlpha((globalOpacity * 178).round())
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(40, shedding ? 20.5 : 20.0),
+      Offset(47, shedding ? 19.5 : 20.0),
+      browPaint,
+    );
+    canvas.drawLine(
+      Offset(53, shedding ? 19.5 : 20.0),
+      Offset(60, shedding ? 20.5 : 20.0),
+      browPaint,
+    );
+
+    // ── Mouth ────────────────────────────────────────────────────────────────
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(50, 32), width: 8, height: 5),
+      Paint()..color = paper.withAlpha((globalOpacity * 140).round()),
+    );
+
+    canvas.restore(); // undo global body scale
   }
 
   @override
   bool shouldRepaint(_WoolPainter old) => old.t != t;
-}
-
-extension on RRect {
-  RRect copyWith({
-    double? left,
-    double? top,
-    double? right,
-    double? bottom,
-  }) {
-    return RRect.fromLTRBR(
-      left ?? this.left,
-      top ?? this.top,
-      right ?? this.right,
-      bottom ?? this.bottom,
-      tlRadius,
-    );
-  }
 }

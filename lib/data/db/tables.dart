@@ -12,6 +12,7 @@ class Mangas extends Table {
   TextColumn get synopsis => text().nullable()();
   TextColumn get author => text().nullable()();
   TextColumn get genres => text().nullable()(); // JSON-encoded List<String>
+  IntColumn get sortOrder => integer().nullable()();
 
   @override
   // ignore: strict_raw_types

@@ -71,6 +71,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _onPageChanged(int page, int total) {
     setState(() => _currentPage = page);
+    if (page >= total - 3) {
+      final next = ref.read(
+          nextChapterIdProvider((widget.mangaId, widget.chapterId)));
+      if (next != null) {
+        ref.read(readerPagesProvider(next));
+      }
+    }
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 500), () {
       unawaited(
@@ -145,7 +152,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     required bool isScroll,
     required bool isRtl,
     String? nextChapterId,
-    ({bool needsJs, String name, String Function(String) browserUrl})? sourceInfo,
+    ({bool needsJs, String name, String id, String Function(String) browserUrl})? sourceInfo,
   }) {
     final needsJs = sourceInfo?.needsJs ?? false;
     if (pagesAsync.isLoading || initialPageAsync.isLoading) {
@@ -241,7 +248,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               GestureDetector(
                 onTap: () => context.push(
                   '/source-browser',
-                  extra: {'url': chapterUrl, 'name': sourceName},
+                  extra: {
+                    'url': chapterUrl,
+                    'name': sourceName,
+                    'sourceId': sourceInfo?.id ?? '',
+                  },
                 ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -505,6 +516,44 @@ class _PageViewerState extends State<_PageViewer> {
                   maxScale: 4.0,
                   inPageView: true,
                 ),
+        loadStateChanged: widget.isScroll
+            ? (state) {
+                if (state.extendedImageLoadState == LoadState.failed) {
+                  return Container(
+                    height: 300,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.broken_image_outlined,
+                            color: slate, size: 32),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () => state.reLoadImage(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0x38FAFAFA),
+                              borderRadius:
+                                  BorderRadius.circular(radiusPill),
+                            ),
+                            child: const Text(
+                              '↻ Tentar novamente',
+                              style: TextStyle(
+                                  color: paper,
+                                  fontSize: 13,
+                                  fontFamily: fontMono),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return null;
+              }
+            : null,
       );
     }
     return ExtendedImage.file(

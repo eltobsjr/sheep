@@ -79,18 +79,31 @@ class TaiyoSource extends HttpMangaSource {
       final mediaId = segments[1];
       if (!seen.add(mediaId)) continue;
 
-      // Title: prefer an explicit heading, fall back to first line of text
+      // Title: heading → img alt (only if ends with " cover") → paragraph → rawText
+      // [class*="title"] is intentionally omitted — too generic, matches UI labels
+      // like "medias banner". Alt is only used when Taiyo explicitly sets it as
+      // "{title} cover", not when it's an auto-generated CDN path fragment.
       final titleEl = a.querySelector('h2') ??
           a.querySelector('h3') ??
-          a.querySelector('h1') ??
-          a.querySelector('[class*="title"]');
-      final rawText = a.text.trim();
-      final title = titleEl?.text.trim().isNotEmpty == true
-          ? titleEl!.text.trim()
-          : rawText.split('\n').first.trim();
-
-      // Cover: look for any img inside the card
+          a.querySelector('h1');
       final img = a.querySelector('img');
+      final imgAlt = img?.attributes['alt']?.trim() ?? '';
+      final altTitle = imgAlt.toLowerCase().endsWith(' cover')
+          ? imgAlt.substring(0, imgAlt.length - 6).trim()
+          : '';
+      final paraTitle = a.querySelector('p')?.text.trim() ?? '';
+      final rawText = a.text.trim();
+      final rawFirst = rawText.split('\n').first.trim();
+      final fallback = rawFirst.length > 80 ? rawFirst.substring(0, 80).trim() : rawFirst;
+      final title = (titleEl?.text.trim().isNotEmpty == true)
+          ? titleEl!.text.trim()
+          : altTitle.isNotEmpty
+              ? altTitle
+              : paraTitle.isNotEmpty
+                  ? paraTitle
+                  : fallback;
+
+      // Cover: reuse img found above
       final rawSrc = img?.attributes['src'] ??
           img?.attributes['data-src'] ?? '';
       final coverUrl = rawSrc.isNotEmpty ? _extractCdnUrl(rawSrc) : '';

@@ -38,8 +38,13 @@ abstract class HttpMangaSource extends MangaSource {
     ));
     dio.interceptors
       ..add(CookieManager(cookieJar))
-      ..add(_RateLimitInterceptor())
-      ..add(CloudflareInterceptor(id, baseUrl, dio));
+      ..add(_RateLimitInterceptor());
+    // CF bypass popup only for non-JS sources. Sources with requiresJavaScript=true
+    // (ToonLivre, MangaFire) open chapters in Source Browser — the user solves CF
+    // there naturally. If their HTTP scraping hits 403, it fails silently in the UI.
+    if (!requiresJavaScript) {
+      dio.interceptors.add(CloudflareInterceptor(id, baseUrl, dio));
+    }
     if (this is SourceAuth) {
       // 401 detection — notifies AuthService so the UI can prompt re-login.
       dio.interceptors.add(AuthInterceptor(sourceId: id, sourceName: name));

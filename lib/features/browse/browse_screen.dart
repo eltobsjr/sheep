@@ -250,6 +250,7 @@ class BrowseScreen extends ConsumerWidget {
                     context.push('/source-browser', extra: {
                       'url': source.baseUrl,
                       'name': source.name,
+                      'sourceId': source.id,
                     });
                   },
                   behavior: HitTestBehavior.opaque,
@@ -356,6 +357,7 @@ class BrowseScreen extends ConsumerWidget {
                               context.push('/source-browser', extra: {
                                 'url': source.baseUrl,
                                 'name': source.name,
+                                'sourceId': source.id,
                               });
                             },
                             child: Text(
@@ -448,7 +450,22 @@ Future<void> _onMangaTap(
         title: manga.title,
         url: manga.url,
       );
-  if (context.mounted) unawaited(context.push('/manga/${manga.id}'));
+  if (!context.mounted) return;
+
+  final source = sourceById(manga.sourceId);
+  if (source != null && source.httpBlocked) {
+    // HTTP is blocked at TLS level — open the manga directly in Source Browser.
+    final mangaUrl = manga.url.isNotEmpty
+        ? source.mangaBrowserUrl(manga.url)
+        : source.baseUrl;
+    unawaited(context.push('/source-browser', extra: {
+      'url': mangaUrl,
+      'name': source.name,
+      'sourceId': source.id,
+    }));
+  } else {
+    unawaited(context.push('/manga/${manga.id}'));
+  }
 }
 
 Widget _buildMangaSliver({

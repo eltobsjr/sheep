@@ -7,10 +7,6 @@ final libraryMangasProvider = StreamProvider.autoDispose<List<Manga>>((ref) {
   return ref.watch(databaseProvider).watchLibraryMangas();
 });
 
-final lastReadProvider = StreamProvider.autoDispose<LastReadEntry?>((ref) {
-  return ref.watch(databaseProvider).watchLastRead();
-});
-
 final recentlyReadProvider = StreamProvider.autoDispose<List<LastReadEntry>>((ref) {
   return ref.watch(databaseProvider).watchRecentlyRead();
 });
@@ -21,4 +17,8 @@ final libraryProgressProvider =
       .watch(databaseProvider)
       .watchLibraryProgress()
       .map((list) => {for (final e in list) e.mangaId: e});
+});
+
+final historyProvider = StreamProvider.autoDispose<List<LastReadEntry>>((ref) {
+  return ref.watch(databaseProvider).watchRecentlyRead(limit: 100);
 });

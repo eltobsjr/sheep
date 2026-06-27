@@ -9,6 +9,7 @@ import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/wool_loading.dart';
 import '../../data/db/app_database.dart';
+import '../../data/db/database_provider.dart';
 import '../../data/sources/source_registry.dart';
 import 'library_providers.dart';
 
@@ -109,6 +110,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               onMangaTap: (id) => context.push('/manga/$id'),
               onReadTap: (mangaId, chapterId) =>
                   context.push('/reader/$mangaId/$chapterId'),
+              onReorder: (ids) =>
+                  ref.read(databaseProvider).updateSortOrders(ids),
               c: c,
             );
           },
@@ -225,6 +228,7 @@ class _FilledState extends StatefulWidget {
     required this.onSearchToggle,
     required this.onMangaTap,
     required this.onReadTap,
+    required this.onReorder,
     required this.c,
   });
 
@@ -237,6 +241,7 @@ class _FilledState extends StatefulWidget {
   final VoidCallback onSearchToggle;
   final void Function(String mangaId) onMangaTap;
   final void Function(String mangaId, String chapterId) onReadTap;
+  final void Function(List<String> ids) onReorder;
   final SheepColors c;
 
   @override
@@ -244,6 +249,9 @@ class _FilledState extends StatefulWidget {
 }
 
 class _FilledStateState extends State<_FilledState> {
+  bool _reordering = false;
+  String? _filterSourceId;
+
   @override
   void initState() {
     super.initState();
@@ -258,17 +266,93 @@ class _FilledStateState extends State<_FilledState> {
     super.dispose();
   }
 
+  void _toggleReorder() => setState(() => _reordering = !_reordering);
+
+  void _showFilterSheet(BuildContext context, List<Manga> allMangas) {
+    final c = widget.c;
+    final sourceIds = allMangas.map((m) => m.sourceId).toSet().toList();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: c.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(radiusCard)),
+      ),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: c.wool,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Filtrar por fonte',
+                style: TextStyle(
+                  fontFamily: fontDisplay,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: c.ink,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _FilterChip(
+                    label: 'Todas',
+                    selected: _filterSourceId == null,
+                    c: c,
+                    onTap: () {
+                      setState(() => _filterSourceId = null);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  for (final sid in sourceIds)
+                    _FilterChip(
+                      label: sourceById(sid)?.name ?? sid,
+                      selected: _filterSourceId == sid,
+                      c: c,
+                      onTap: () {
+                        setState(() => _filterSourceId = sid);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.c;
     final searching = widget.searching;
     final searchCtrl = widget.searchCtrl;
     final query = searchCtrl.text.trim().toLowerCase();
-    final mangas = query.isEmpty
-        ? widget.mangas
-        : widget.mangas
-            .where((m) => m.title.toLowerCase().contains(query))
-            .toList();
+    final mangas = (() {
+      var list = widget.mangas;
+      if (_filterSourceId != null) {
+        list = list.where((m) => m.sourceId == _filterSourceId).toList();
+      }
+      if (query.isNotEmpty) {
+        list = list.where((m) => m.title.toLowerCase().contains(query)).toList();
+      }
+      return list;
+    })();
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,6 +424,77 @@ class _FilledStateState extends State<_FilledState> {
                       ),
                     ),
                   ),
+                  // History button
+                  GestureDetector(
+                    onTap: () => context.push('/history'),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: c.wool,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(Icons.history, size: 18, color: c.ink),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Filter toggle
+                  GestureDetector(
+                    onTap: () => _showFilterSheet(context, widget.mangas),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _filterSourceId != null ? c.ink : c.wool,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.filter_list,
+                          size: 18,
+                          color: _filterSourceId != null ? c.paper : c.ink,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Reorder toggle
+                  GestureDetector(
+                    onTap: _toggleReorder,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _reordering ? c.ink : c.wool,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.sort,
+                          size: 18,
+                          color: _reordering ? c.paper : c.ink,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: widget.onSearchToggle,
                     behavior: HitTestBehavior.opaque,
@@ -426,7 +581,9 @@ class _FilledStateState extends State<_FilledState> {
                 Text(
                   searching && mangas.length < widget.totalCount
                       ? '${mangas.length} of ${widget.totalCount}'
-                      : 'ALL · ${widget.totalCount}',
+                      : _filterSourceId != null
+                          ? '${sourceById(_filterSourceId!)?.name ?? _filterSourceId} · ${mangas.length}'
+                          : 'ALL · ${widget.totalCount}',
                   style: TextStyle(
                     fontSize: 10,
                     height: 1,
@@ -438,42 +595,66 @@ class _FilledStateState extends State<_FilledState> {
             ),
           ),
 
-          // ── 2-column grid ────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                const crossAxisCount = 2;
-                const crossAxisSpacing = 12.0;
-                const belowCoverHeight = 42.0;
-                final cellWidth =
-                    (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
-                    crossAxisCount;
-                final coverHeight = cellWidth * 4 / 3;
-                final cellHeight = coverHeight + belowCoverHeight;
-
-                return GridView.builder(
-                  shrinkWrap: true,
+          // ── Grid or reorder list ─────────────────────────────────────────
+          if (_reordering)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: SizedBox(
+                height: mangas.length * 72.0,
+                child: ReorderableListView.builder(
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: crossAxisSpacing,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: cellWidth / cellHeight,
-                  ),
                   itemCount: mangas.length,
-                  itemBuilder: (context, i) => GestureDetector(
+                  onReorderItem: (oldIndex, newIndex) {
+                    final reordered = [...mangas];
+                    final item = reordered.removeAt(oldIndex);
+                    reordered.insert(newIndex, item);
+                    widget.onReorder(reordered.map((m) => m.id).toList());
+                  },
+                  itemBuilder: (context, i) => _ReorderRow(
+                    key: ValueKey(mangas[i].id),
+                    manga: mangas[i],
+                    c: c,
                     onTap: () => widget.onMangaTap(mangas[i].id),
-                    child: _MangaCard(
-                      manga: mangas[i],
-                      progress: widget.progress[mangas[i].id],
-                      c: c,
-                    ),
                   ),
-                );
-              },
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  const crossAxisCount = 2;
+                  const crossAxisSpacing = 12.0;
+                  const belowCoverHeight = 42.0;
+                  final cellWidth =
+                      (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
+                      crossAxisCount;
+                  final coverHeight = cellWidth * 4 / 3;
+                  final cellHeight = coverHeight + belowCoverHeight;
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: crossAxisSpacing,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: cellWidth / cellHeight,
+                    ),
+                    itemCount: mangas.length,
+                    itemBuilder: (context, i) => GestureDetector(
+                      onTap: () => widget.onMangaTap(mangas[i].id),
+                      child: _MangaCard(
+                        manga: mangas[i],
+                        progress: widget.progress[mangas[i].id],
+                        c: c,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -597,6 +778,108 @@ class _ContinueReadingCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Reorder list row ──────────────────────────────────────────────────────────
+
+class _ReorderRow extends StatelessWidget {
+  const _ReorderRow({
+    required this.manga,
+    required this.c,
+    required this.onTap,
+    super.key,
+  });
+
+  final Manga manga;
+  final SheepColors c;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 64,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: c.wool,
+          borderRadius: BorderRadius.circular(radiusCard),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: _CoverThumbnail(
+                coverPath: manga.coverPath,
+                mangaId: manga.id,
+                title: manga.title,
+                width: 36,
+                height: 48,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                manga.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                  color: c.ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.drag_handle, color: c.slate, size: 20),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Filter chip ──────────────────────────────────────────────────────────────
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.c,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final SheepColors c;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? c.ink : c.wool,
+          borderRadius: BorderRadius.circular(radiusPill),
+          border: Border.all(color: selected ? c.ink : c.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: fontMono,
+            fontSize: 13,
+            height: 1,
+            color: selected ? c.paper : c.ink,
+          ),
+        ),
       ),
     );
   }

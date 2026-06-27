@@ -1,4 +1,7 @@
+import 'dart:io' as io;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +9,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../data/db/database_provider.dart';
+import '../../data/sources/http_manga_source.dart';
+import '../../data/sources/source_registry.dart';
 
 // Full-screen WebView browser for a single manga source.
 // Blocks all navigation outside the source domain and Cloudflare infrastructure.
@@ -15,15 +20,17 @@ import '../../data/db/database_provider.dart';
 // "Marcar como lido" button appears in the toolbar to track reading progress.
 class SourceBrowserScreen extends ConsumerStatefulWidget {
   const SourceBrowserScreen({
-    super.key,
     required this.url,
     required this.sourceName,
+    required this.sourceId,
     this.mangaId,
     this.chapterId,
+    super.key,
   });
 
   final String url;
   final String sourceName;
+  final String sourceId;
   final String? mangaId;
   final String? chapterId;
 
@@ -57,6 +64,9 @@ class _SourceBrowserScreenState extends ConsumerState<SourceBrowserScreen> {
       ..loadRequest(Uri.parse(widget.url));
   }
 
+  // Reads cookies for [url] from Android's native WebView cookie store.
+  static const _cookieChannel = MethodChannel('sheep/cookies');
+
   Future<void> _onPageFinished() async {
     final back = await _controller.canGoBack();
     final fwd = await _controller.canGoForward();
@@ -67,6 +77,39 @@ class _SourceBrowserScreenState extends ConsumerState<SourceBrowserScreen> {
         _canGoForward = fwd;
       });
     }
+    // Sync WebView cookies → source Dio CookieJar so API calls work after CF
+    // is solved naturally in the browser (e.g., ToonLivre chapters endpoint).
+    await _syncCookies();
+  }
+
+  Future<void> _syncCookies() async {
+    if (!io.Platform.isAndroid) return;
+    final source = sourceById(widget.sourceId);
+    if (source is! HttpMangaSource) return;
+    try {
+      final currentUrl = await _controller.currentUrl() ?? widget.url;
+      final cookieStr = await _cookieChannel.invokeMethod<String>(
+        'getCookies',
+        {'url': currentUrl},
+      );
+      if (cookieStr == null || cookieStr.isEmpty) return;
+      final uri = Uri.parse(currentUrl);
+      final cookies = <io.Cookie>[];
+      for (final part in cookieStr.split('; ')) {
+        final eqIdx = part.indexOf('=');
+        if (eqIdx <= 0) continue;
+        final name = part.substring(0, eqIdx).trim();
+        final value = part.substring(eqIdx + 1).trim();
+        cookies.add(
+          io.Cookie(name, value)
+            ..domain = uri.host
+            ..path = '/',
+        );
+      }
+      if (cookies.isNotEmpty) {
+        await source.cookieJar.saveFromResponse(uri, cookies);
+      }
+    } catch (_) {}
   }
 
   NavigationDecision _allow(String url, String sourceHost) {
@@ -150,8 +193,7 @@ class _SourceBrowserScreenState extends ConsumerState<SourceBrowserScreen> {
                       child: Container(
                         margin: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 0),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
                           color: _markedRead ? ink : wool,
                           borderRadius:

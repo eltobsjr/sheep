@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/sheep_colors.dart';
 import '../../core/theme/tokens.dart';
@@ -131,6 +134,11 @@ class SettingsScreen extends ConsumerWidget {
                 c: c,
               ),
             ),
+
+            // ── Dados ─────────────────────────────────────────────────────────
+            SliverToBoxAdapter(child: _SectionLabel('Dados', c: c)),
+
+            SliverToBoxAdapter(child: _ExportRow(c: c)),
 
             // ── About ────────────────────────────────────────────────────────
             SliverToBoxAdapter(child: _SectionLabel('About', c: c)),
@@ -393,6 +401,97 @@ class _ChevronRow extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Export row ────────────────────────────────────────────────────────────────
+
+class _ExportRow extends StatefulWidget {
+  const _ExportRow({required this.c});
+  final SheepColors c;
+
+  @override
+  State<_ExportRow> createState() => _ExportRowState();
+}
+
+class _ExportRowState extends State<_ExportRow> {
+  bool _loading = false;
+
+  Future<void> _export() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final dbFile = File('${docDir.path}/sheep.db');
+      if (!dbFile.existsSync()) {
+        _show('Arquivo de banco não encontrado');
+        return;
+      }
+      final extDir = await getExternalStorageDirectory();
+      if (extDir == null) {
+        _show('Armazenamento externo indisponível');
+        return;
+      }
+      final ts = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .substring(0, 19);
+      final dest = File('${extDir.path}/sheep-backup-$ts.db');
+      await dbFile.copy(dest.path);
+      _show('Backup salvo em ${dest.path}');
+    } catch (e) {
+      _show('Erro ao exportar: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _show(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontSize: 13)),
+      duration: const Duration(seconds: 4),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return GestureDetector(
+      onTap: _export,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: c.border)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Exportar backup',
+                    style: TextStyle(fontSize: 14, height: 1.2, color: c.ink)),
+                const SizedBox(height: 3),
+                Text('Copia sheep.db para o armazenamento externo',
+                    style: TextStyle(fontSize: 12, height: 1.3, color: c.slate)),
+              ],
+            ),
+            _loading
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: c.slate,
+                    ),
+                  )
+                : Icon(Icons.download_outlined, size: 16, color: c.slate),
+          ],
+        ),
       ),
     );
   }

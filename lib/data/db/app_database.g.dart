@@ -110,6 +110,17 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -122,6 +133,7 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
     synopsis,
     author,
     genres,
+    sortOrder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -202,6 +214,12 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
         genres.isAcceptableOrUnknown(data['genres']!, _genresMeta),
       );
     }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
     return context;
   }
 
@@ -251,6 +269,10 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
         DriftSqlType.string,
         data['${effectivePrefix}genres'],
       ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      ),
     );
   }
 
@@ -271,6 +293,7 @@ class Manga extends DataClass implements Insertable<Manga> {
   final String? synopsis;
   final String? author;
   final String? genres;
+  final int? sortOrder;
   const Manga({
     required this.id,
     required this.sourceId,
@@ -282,6 +305,7 @@ class Manga extends DataClass implements Insertable<Manga> {
     this.synopsis,
     this.author,
     this.genres,
+    this.sortOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -304,6 +328,9 @@ class Manga extends DataClass implements Insertable<Manga> {
     if (!nullToAbsent || genres != null) {
       map['genres'] = Variable<String>(genres);
     }
+    if (!nullToAbsent || sortOrder != null) {
+      map['sort_order'] = Variable<int>(sortOrder);
+    }
     return map;
   }
 
@@ -325,6 +352,9 @@ class Manga extends DataClass implements Insertable<Manga> {
       genres: genres == null && nullToAbsent
           ? const Value.absent()
           : Value(genres),
+      sortOrder: sortOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sortOrder),
     );
   }
 
@@ -344,6 +374,7 @@ class Manga extends DataClass implements Insertable<Manga> {
       synopsis: serializer.fromJson<String?>(json['synopsis']),
       author: serializer.fromJson<String?>(json['author']),
       genres: serializer.fromJson<String?>(json['genres']),
+      sortOrder: serializer.fromJson<int?>(json['sortOrder']),
     );
   }
   @override
@@ -360,6 +391,7 @@ class Manga extends DataClass implements Insertable<Manga> {
       'synopsis': serializer.toJson<String?>(synopsis),
       'author': serializer.toJson<String?>(author),
       'genres': serializer.toJson<String?>(genres),
+      'sortOrder': serializer.toJson<int?>(sortOrder),
     };
   }
 
@@ -374,6 +406,7 @@ class Manga extends DataClass implements Insertable<Manga> {
     Value<String?> synopsis = const Value.absent(),
     Value<String?> author = const Value.absent(),
     Value<String?> genres = const Value.absent(),
+    Value<int?> sortOrder = const Value.absent(),
   }) => Manga(
     id: id ?? this.id,
     sourceId: sourceId ?? this.sourceId,
@@ -385,6 +418,7 @@ class Manga extends DataClass implements Insertable<Manga> {
     synopsis: synopsis.present ? synopsis.value : this.synopsis,
     author: author.present ? author.value : this.author,
     genres: genres.present ? genres.value : this.genres,
+    sortOrder: sortOrder.present ? sortOrder.value : this.sortOrder,
   );
   Manga copyWithCompanion(MangasCompanion data) {
     return Manga(
@@ -398,6 +432,7 @@ class Manga extends DataClass implements Insertable<Manga> {
       synopsis: data.synopsis.present ? data.synopsis.value : this.synopsis,
       author: data.author.present ? data.author.value : this.author,
       genres: data.genres.present ? data.genres.value : this.genres,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
   }
 
@@ -413,7 +448,8 @@ class Manga extends DataClass implements Insertable<Manga> {
           ..write('url: $url, ')
           ..write('synopsis: $synopsis, ')
           ..write('author: $author, ')
-          ..write('genres: $genres')
+          ..write('genres: $genres, ')
+          ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
   }
@@ -430,6 +466,7 @@ class Manga extends DataClass implements Insertable<Manga> {
     synopsis,
     author,
     genres,
+    sortOrder,
   );
   @override
   bool operator ==(Object other) =>
@@ -444,7 +481,8 @@ class Manga extends DataClass implements Insertable<Manga> {
           other.url == this.url &&
           other.synopsis == this.synopsis &&
           other.author == this.author &&
-          other.genres == this.genres);
+          other.genres == this.genres &&
+          other.sortOrder == this.sortOrder);
 }
 
 class MangasCompanion extends UpdateCompanion<Manga> {
@@ -458,6 +496,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   final Value<String?> synopsis;
   final Value<String?> author;
   final Value<String?> genres;
+  final Value<int?> sortOrder;
   final Value<int> rowid;
   const MangasCompanion({
     this.id = const Value.absent(),
@@ -470,6 +509,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     this.synopsis = const Value.absent(),
     this.author = const Value.absent(),
     this.genres = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MangasCompanion.insert({
@@ -483,6 +523,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     this.synopsis = const Value.absent(),
     this.author = const Value.absent(),
     this.genres = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sourceId = Value(sourceId),
@@ -500,6 +541,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     Expression<String>? synopsis,
     Expression<String>? author,
     Expression<String>? genres,
+    Expression<int>? sortOrder,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -513,6 +555,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
       if (synopsis != null) 'synopsis': synopsis,
       if (author != null) 'author': author,
       if (genres != null) 'genres': genres,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -528,6 +571,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     Value<String?>? synopsis,
     Value<String?>? author,
     Value<String?>? genres,
+    Value<int?>? sortOrder,
     Value<int>? rowid,
   }) {
     return MangasCompanion(
@@ -541,6 +585,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
       synopsis: synopsis ?? this.synopsis,
       author: author ?? this.author,
       genres: genres ?? this.genres,
+      sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -578,6 +623,9 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     if (genres.present) {
       map['genres'] = Variable<String>(genres.value);
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -597,6 +645,7 @@ class MangasCompanion extends UpdateCompanion<Manga> {
           ..write('synopsis: $synopsis, ')
           ..write('author: $author, ')
           ..write('genres: $genres, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1226,7 +1275,12 @@ class $ReadingProgressTable extends ReadingProgress
     defaultValue: const Constant(false),
   );
   @override
-  List<GeneratedColumn> get $columns => [chapterId, lastPage, updatedAt, isRead];
+  List<GeneratedColumn> get $columns => [
+    chapterId,
+    lastPage,
+    updatedAt,
+    isRead,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1293,7 +1347,7 @@ class $ReadingProgressTable extends ReadingProgress
       isRead: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_read'],
-      ) ?? false,
+      )!,
     );
   }
 
@@ -1313,7 +1367,7 @@ class ReadingProgressData extends DataClass
     required this.chapterId,
     required this.lastPage,
     required this.updatedAt,
-    this.isRead = false,
+    required this.isRead,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1343,7 +1397,7 @@ class ReadingProgressData extends DataClass
       chapterId: serializer.fromJson<String>(json['chapterId']),
       lastPage: serializer.fromJson<int>(json['lastPage']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
-      isRead: serializer.fromJson<bool>(json['isRead'] ?? false),
+      isRead: serializer.fromJson<bool>(json['isRead']),
     );
   }
   @override
@@ -1584,7 +1638,7 @@ class $DownloadQueueTable extends DownloadQueue
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => const {};
+  Set<GeneratedColumn> get $primaryKey => {chapterId};
   @override
   DownloadQueueData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -2207,6 +2261,7 @@ typedef $$MangasTableCreateCompanionBuilder =
       Value<String?> synopsis,
       Value<String?> author,
       Value<String?> genres,
+      Value<int?> sortOrder,
       Value<int> rowid,
     });
 typedef $$MangasTableUpdateCompanionBuilder =
@@ -2221,6 +2276,7 @@ typedef $$MangasTableUpdateCompanionBuilder =
       Value<String?> synopsis,
       Value<String?> author,
       Value<String?> genres,
+      Value<int?> sortOrder,
       Value<int> rowid,
     });
 
@@ -2232,7 +2288,7 @@ final class $$MangasTableReferences
     _$AppDatabase db,
   ) => MultiTypedResultKey.fromTable(
     db.chapters,
-    aliasName: $_aliasNameGenerator(db.mangas.id, db.chapters.mangaId),
+    aliasName: 'mangas__id__chapters__manga_id',
   );
 
   $$ChaptersTableProcessedTableManager get chaptersRefs {
@@ -2304,6 +2360,11 @@ class $$MangasTableFilterComposer
 
   ColumnFilters<String> get genres => $composableBuilder(
     column: $table.genres,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2391,6 +2452,11 @@ class $$MangasTableOrderingComposer
     column: $table.genres,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MangasTableAnnotationComposer
@@ -2431,6 +2497,9 @@ class $$MangasTableAnnotationComposer
 
   GeneratedColumn<String> get genres =>
       $composableBuilder(column: $table.genres, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   Expression<T> chaptersRefs<T extends Object>(
     Expression<T> Function($$ChaptersTableAnnotationComposer a) f,
@@ -2496,6 +2565,7 @@ class $$MangasTableTableManager
                 Value<String?> synopsis = const Value.absent(),
                 Value<String?> author = const Value.absent(),
                 Value<String?> genres = const Value.absent(),
+                Value<int?> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MangasCompanion(
                 id: id,
@@ -2508,6 +2578,7 @@ class $$MangasTableTableManager
                 synopsis: synopsis,
                 author: author,
                 genres: genres,
+                sortOrder: sortOrder,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2522,6 +2593,7 @@ class $$MangasTableTableManager
                 Value<String?> synopsis = const Value.absent(),
                 Value<String?> author = const Value.absent(),
                 Value<String?> genres = const Value.absent(),
+                Value<int?> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MangasCompanion.insert(
                 id: id,
@@ -2534,6 +2606,7 @@ class $$MangasTableTableManager
                 synopsis: synopsis,
                 author: author,
                 genres: genres,
+                sortOrder: sortOrder,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2613,9 +2686,8 @@ final class $$ChaptersTableReferences
     extends BaseReferences<_$AppDatabase, $ChaptersTable, Chapter> {
   $$ChaptersTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $MangasTable _mangaIdTable(_$AppDatabase db) => db.mangas.createAlias(
-    $_aliasNameGenerator(db.chapters.mangaId, db.mangas.id),
-  );
+  static $MangasTable _mangaIdTable(_$AppDatabase db) =>
+      db.mangas.createAlias('chapters__manga_id__mangas__id');
 
   $$MangasTableProcessedTableManager get mangaId {
     final $_column = $_itemColumn<String>('manga_id')!;
@@ -2634,10 +2706,7 @@ final class $$ChaptersTableReferences
   static MultiTypedResultKey<$ReadingProgressTable, List<ReadingProgressData>>
   _readingProgressRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.readingProgress,
-    aliasName: $_aliasNameGenerator(
-      db.chapters.id,
-      db.readingProgress.chapterId,
-    ),
+    aliasName: 'chapters__id__reading_progress__chapter_id',
   );
 
   $$ReadingProgressTableProcessedTableManager get readingProgressRefs {
@@ -3083,6 +3152,7 @@ typedef $$ReadingProgressTableCreateCompanionBuilder =
       required String chapterId,
       required int lastPage,
       required DateTime updatedAt,
+      Value<bool> isRead,
       Value<int> rowid,
     });
 typedef $$ReadingProgressTableUpdateCompanionBuilder =
@@ -3090,6 +3160,7 @@ typedef $$ReadingProgressTableUpdateCompanionBuilder =
       Value<String> chapterId,
       Value<int> lastPage,
       Value<DateTime> updatedAt,
+      Value<bool> isRead,
       Value<int> rowid,
     });
 
@@ -3107,9 +3178,7 @@ final class $$ReadingProgressTableReferences
   );
 
   static $ChaptersTable _chapterIdTable(_$AppDatabase db) =>
-      db.chapters.createAlias(
-        $_aliasNameGenerator(db.readingProgress.chapterId, db.chapters.id),
-      );
+      db.chapters.createAlias('reading_progress__chapter_id__chapters__id');
 
   $$ChaptersTableProcessedTableManager get chapterId {
     final $_column = $_itemColumn<String>('chapter_id')!;
@@ -3142,6 +3211,11 @@ class $$ReadingProgressTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRead => $composableBuilder(
+    column: $table.isRead,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3188,6 +3262,11 @@ class $$ReadingProgressTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isRead => $composableBuilder(
+    column: $table.isRead,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ChaptersTableOrderingComposer get chapterId {
     final $$ChaptersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3226,6 +3305,9 @@ class $$ReadingProgressTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRead =>
+      $composableBuilder(column: $table.isRead, builder: (column) => column);
 
   $$ChaptersTableAnnotationComposer get chapterId {
     final $$ChaptersTableAnnotationComposer composer = $composerBuilder(
@@ -3284,11 +3366,13 @@ class $$ReadingProgressTableTableManager
                 Value<String> chapterId = const Value.absent(),
                 Value<int> lastPage = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> isRead = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingProgressCompanion(
                 chapterId: chapterId,
                 lastPage: lastPage,
                 updatedAt: updatedAt,
+                isRead: isRead,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3296,11 +3380,13 @@ class $$ReadingProgressTableTableManager
                 required String chapterId,
                 required int lastPage,
                 required DateTime updatedAt,
+                Value<bool> isRead = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingProgressCompanion.insert(
                 chapterId: chapterId,
                 lastPage: lastPage,
                 updatedAt: updatedAt,
+                isRead: isRead,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

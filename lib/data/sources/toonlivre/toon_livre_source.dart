@@ -36,9 +36,21 @@ class ToonLivreSource extends HttpMangaSource {
   @override
   bool get requiresJavaScript => true;
 
+  // CF blocks Dart's HTTP client at TLS fingerprint level — no API access possible.
+  @override
+  bool get httpBlocked => true;
+
   @override
   String chapterBrowserUrl(String chapterUrl) =>
       chapterUrl.startsWith('http') ? chapterUrl : '$baseUrl/$chapterUrl';
+
+  // mangaUrl is stored as "{numericId}/{slug}" — browser URL uses only the slug.
+  @override
+  String mangaBrowserUrl(String mangaUrl) {
+    final idx = mangaUrl.indexOf('/');
+    final slug = idx >= 0 ? mangaUrl.substring(idx + 1) : mangaUrl;
+    return '$baseUrl/$slug';
+  }
 
   @override
   Map<String, String> get defaultHeaders => {
