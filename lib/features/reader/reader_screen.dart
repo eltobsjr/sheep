@@ -34,6 +34,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   int _currentPage = 0;
+  int _lastKnownTotal = 0;
   bool _initialPageSynced = false;
   bool _overlayVisible = true;
   Timer? _overlayTimer;
@@ -53,6 +54,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void dispose() {
     _overlayTimer?.cancel();
     _saveDebounce?.cancel();
+    // A debounced save cancelled by exiting mid-timer would silently drop
+    // the final page reached — flush it here so "continue reading" always
+    // lands on the right chapter instead of the tail of the one just read.
+    if (_lastKnownTotal > 0) {
+      unawaited(
+        ref.read(databaseProvider).saveReadingProgress(
+              chapterId: widget.chapterId,
+              lastPage: _currentPage + 1,
+              pageCount: _lastKnownTotal,
+            ),
+      );
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
     super.dispose();
@@ -80,6 +93,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _onPageChanged(int page, int total) {
     setState(() => _currentPage = page);
+    _lastKnownTotal = total;
     if (page >= total - 3) {
       final next = ref.read(
           nextChapterIdProvider((widget.mangaId, widget.chapterId)));
@@ -387,13 +401,24 @@ class _PageViewer extends StatefulWidget {
   State<_PageViewer> createState() => _PageViewerState();
 }
 
+// Portrait-manga width:height heuristic used both to estimate the initial
+// scroll offset and to reserve stable item height while a page is still
+// loading (avoids layout shift / jumpy scrolling as images pop in).
+const double _kEstimatedPageAspect = 1.45;
+
 class _PageViewerState extends State<_PageViewer> {
   late final ScrollController _scrollCtrl;
   late final ExtendedPageController _pageController;
+  final TransformationController _zoomCtrl = TransformationController();
+  final GlobalKey _scrollListKey = GlobalKey();
   int _currentPage = 0;
   int _screenWidth = 0;
+  int _activeTouches = 0;
+  // True while InteractiveViewer (not the bare ListView) owns gestures —
+  // during an active pinch, or while still zoomed in after one finger lifts.
+  bool _zoomActive = false;
 
-  // Per-page GlobalKeys for controlling gesture state (zoom).
+  // Per-page GlobalKeys for controlling gesture state (zoom) — paged mode only.
   final Map<int, GlobalKey<ExtendedImageGestureState>> _gestureKeys = {};
 
   @override
@@ -411,7 +436,8 @@ class _PageViewerState extends State<_PageViewer> {
           WidgetsBinding.instance.platformDispatcher.views.first;
       final logicalWidth =
           view.physicalSize.width / view.devicePixelRatio;
-      initialOffset = logicalWidth * 1.45 * widget.initialPage;
+      initialOffset =
+          logicalWidth * _kEstimatedPageAspect * widget.initialPage;
     }
     _scrollCtrl = ScrollController(initialScrollOffset: initialOffset);
     _scrollCtrl.addListener(_onScroll);
@@ -428,7 +454,35 @@ class _PageViewerState extends State<_PageViewer> {
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
     _pageController.dispose();
+    _zoomCtrl.dispose();
     super.dispose();
+  }
+
+  // Only 2+ simultaneous fingers (a pinch) — or panning while already
+  // zoomed — should route through InteractiveViewer. A bare single-finger
+  // drag must stay owned by the ListView the whole time, otherwise
+  // InteractiveViewer permanently steals scroll from the nested Scrollable
+  // (a well-known Flutter gesture-arena conflict).
+  void _onZoomPointerDown(PointerDownEvent event) {
+    _activeTouches++;
+    if (_activeTouches >= 2 && !_zoomActive) {
+      setState(() => _zoomActive = true);
+    }
+  }
+
+  void _onZoomPointerUp(PointerEvent event) {
+    _activeTouches = (_activeTouches - 1).clamp(0, 20);
+    if (_activeTouches == 0 && _zoomCtrl.value.getMaxScaleOnAxis() <= 1.01) {
+      _zoomCtrl.value = Matrix4.identity();
+      setState(() => _zoomActive = false);
+    }
+  }
+
+  void _onZoomInteractionEnd(ScaleEndDetails details) {
+    if (_activeTouches == 0 && _zoomCtrl.value.getMaxScaleOnAxis() <= 1.01) {
+      _zoomCtrl.value = Matrix4.identity();
+      setState(() => _zoomActive = false);
+    }
   }
 
   void _prefetchPages(int current) {
@@ -509,78 +563,109 @@ class _PageViewerState extends State<_PageViewer> {
     }
   }
 
+  // Paged mode only: per-image pinch/double-tap zoom, driven by the overlay's
+  // −/+ buttons via _gestureKeyFor. Scroll mode has no per-image gesture —
+  // zoom there is global, applied to the whole strip (see build()).
+  Widget? _loadStateBuilder(ExtendedImageState state) {
+    if (state.extendedImageLoadState == LoadState.loading && widget.isScroll) {
+      // Reserve the estimated final height so pages don't reflow/jump the
+      // scroll position as images pop in during fast or reversed scrolling.
+      return const AspectRatio(
+        aspectRatio: 1 / _kEstimatedPageAspect,
+        child: Center(child: WoolLoading()),
+      );
+    }
+    if (state.extendedImageLoadState == LoadState.failed) {
+      return Container(
+        height: 300,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.broken_image_outlined, color: slate, size: 32),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => state.reLoadImage(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0x38FAFAFA),
+                  borderRadius: BorderRadius.circular(radiusPill),
+                ),
+                child: const Text(
+                  '↻ Tentar novamente',
+                  style: TextStyle(
+                      color: paper, fontSize: 13, fontFamily: fontMono),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return null;
+  }
+
   Widget _buildImage(PageImage page, int index) {
-    // Scroll mode: no gesture key needed (zoom is per-image, no overlay buttons).
-    // Paged mode: gesture key allows overlay zoom buttons to control current page.
     final key = widget.isScroll ? null : _gestureKeyFor(index);
     final gestureConfig = GestureConfig(
       minScale: 0.9,
       maxScale: 4.0,
-      inPageView: !widget.isScroll,
+      inPageView: true,
     );
     if (page is NetworkPageImage) {
       return ExtendedImage.network(
         page.url,
         key: key,
         fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
-        mode: ExtendedImageMode.gesture,
+        mode: widget.isScroll
+            ? ExtendedImageMode.none
+            : ExtendedImageMode.gesture,
         cacheWidth: _screenWidth > 0 ? _screenWidth : null,
-        initGestureConfigHandler: (_) => gestureConfig,
-        loadStateChanged: (state) {
-          if (state.extendedImageLoadState == LoadState.failed) {
-            return Container(
-              height: 300,
-              alignment: Alignment.center,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.broken_image_outlined,
-                      color: slate, size: 32),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () => state.reLoadImage(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0x38FAFAFA),
-                        borderRadius: BorderRadius.circular(radiusPill),
-                      ),
-                      child: const Text(
-                        '↻ Tentar novamente',
-                        style: TextStyle(
-                            color: paper,
-                            fontSize: 13,
-                            fontFamily: fontMono),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return null;
-        },
+        initGestureConfigHandler:
+            widget.isScroll ? null : (_) => gestureConfig,
+        loadStateChanged: _loadStateBuilder,
       );
     }
     return ExtendedImage.file(
       (page as FilePageImage).file,
       key: key,
       fit: widget.isScroll ? BoxFit.fitWidth : BoxFit.contain,
-      mode: ExtendedImageMode.gesture,
-      initGestureConfigHandler: (_) => gestureConfig,
+      mode: widget.isScroll ? ExtendedImageMode.none : ExtendedImageMode.gesture,
+      initGestureConfigHandler: widget.isScroll ? null : (_) => gestureConfig,
+      loadStateChanged: _loadStateBuilder,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.isScroll) {
-      return ListView.builder(
+      final listView = ListView.builder(
+        key: _scrollListKey,
         controller: _scrollCtrl,
         physics: const BouncingScrollPhysics(),
         itemCount: widget.pages.length,
         itemBuilder: (context, index) =>
             _buildImage(widget.pages[index], index),
+      );
+      // _scrollListKey is a GlobalKey, so swapping the ListView in/out of
+      // InteractiveViewer preserves its Scrollable state (scroll offset)
+      // instead of resetting it on every zoom start/end.
+      return Listener(
+        onPointerDown: _onZoomPointerDown,
+        onPointerUp: _onZoomPointerUp,
+        onPointerCancel: _onZoomPointerUp,
+        behavior: HitTestBehavior.translucent,
+        child: _zoomActive
+            ? InteractiveViewer(
+                transformationController: _zoomCtrl,
+                minScale: 1.0,
+                maxScale: 4.0,
+                onInteractionEnd: _onZoomInteractionEnd,
+                child: listView,
+              )
+            : listView,
       );
     }
 
@@ -752,8 +837,8 @@ class _Overlay extends StatelessWidget {
           ),
         ),
 
-        // "Next chapter →" button (bottom right, on last page only)
-        if (onNextChapter != null && currentPage == totalPages)
+        // "Next chapter →" button (bottom right, always available)
+        if (onNextChapter != null)
           Positioned(
             right: 16,
             bottom: bottomPad + 28,
